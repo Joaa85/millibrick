@@ -104,7 +104,7 @@ a{color:var(--blue);}
 </div>
  
 <div class="tabs">
-  <button class="tab active" onclick="switchTab('cmf')"><span class="ti">🎭</span>Minifigur</button>
+  <button class="tab active" onclick="switchTab('cmf')"><span class="ti">🎭</span>Minifig box scanner</button>
   <button class="tab" onclick="switchTab('scan')"><span class="ti">🔍</span>Skann kloss</button>
   <button class="tab" onclick="switchTab('build')"><span class="ti">💡</span>Byggeideer</button>
 </div>
@@ -113,16 +113,16 @@ a{color:var(--blue);}
  
   <!-- TAB 1: CMF -->
   <div class="tab-content active" id="tab-cmf">
-    <div class="section-title">🎭 Minifigur-skanner</div>
-    <p class="section-sub">Skann den <strong>kvadratiske koden</strong> på <em>bunnen</em> av CMF-boksen for å se hvilken figur som er inni.</p>
+    <div class="section-title">🎭 Minifig box scanner</div>
+    <p class="section-sub">Hold <strong>bunnen av CMF-boksen</strong> mot kameraet – koden(e) leses automatisk. Du trenger ikke å ta bilde selv.</p>
     <div class="tip-box">
       📦 <strong>Slik gjør du det:</strong><br>
-      Snu boksen. Du ser to koder – dekk til den vanlige strekkoden til venstre med fingeren, og hold den <strong>kvadratiske QR-koden til høyre</strong> mot kamerarammen. Hold boksen ca. 10–15 cm fra kameraet.
+      Snu boksen. Du ser to koder – dekk til den vanlige strekkoden til venstre med fingeren, og hold den <strong>kvadratiske QR-koden til høyre</strong> mot kamerarammen. Hold boksen ca. 10–15 cm fra kameraet. Kameraet skanner løpende – hold gjerne flere bokser opp etter hverandre (eller flere i bildet samtidig), så dukker alle figurene som blir funnet opp i listen under.
     </div>
     <div class="cam-wrap" id="cam-wrap">
       <div class="cam-placeholder" id="cam-placeholder">
         <div class="big">🎭</div>
-        <p>Trykk «Start kamera» og hold QR-koden mot den gule rammen</p>
+        <p id="cam-placeholder-text">Starter kamera...</p>
       </div>
       <video id="cam-video" style="display:none;width:100%;height:100%;object-fit:cover;" autoplay muted playsinline></video>
       <div class="cam-overlay" id="cam-overlay" style="display:none;">
@@ -131,19 +131,7 @@ a{color:var(--blue);}
       <div class="cam-status" id="cam-status" style="display:none;"></div>
     </div>
     <div class="row">
-      <button class="btn btn-red" id="btn-start" onclick="startCMFCamera()">📷 Start kamera</button>
-      <button class="btn btn-stop" id="btn-stop" style="display:none;" onclick="stopCamera()">⏹ Stopp</button>
-    </div>
-    <div class="divider">eller</div>
-    <div class="row">
-      <label class="btn btn-outline" style="cursor:pointer;">
-        📸 Ta bilde av QR-koden
-        <input type="file" accept="image/*" capture="environment" style="display:none" onchange="scanCMFFromImage(event)">
-      </label>
-    </div>
-    <div class="row">
-      <input type="text" id="manual-cmf" class="text-input" placeholder="Lim inn QR-kodetekst her...">
-      <button class="btn btn-blue btn-sm" onclick="lookupCMFManual()">Søk</button>
+      <button class="btn btn-red" id="btn-toggle-cam" onclick="toggleCMFCamera()">📷 Start kamera</button>
     </div>
     <div id="cmf-results"></div>
   </div>
@@ -176,6 +164,7 @@ a{color:var(--blue);}
  
 </div>
  
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
 // CMF DATABASE – kode → figurnavn + serie
@@ -349,15 +338,20 @@ function switchTab(name) {
     if (n === name) document.querySelectorAll('.tab')[i].classList.add('active');
   });
   if (name !== 'cmf') stopCamera();
+  else if (!stream) startCMFCamera();
 }
  
-// ── Camera ─────────────────────────────────────────────────
-let stream = null, scanInterval = null, lastCode = null;
+// ── Camera: løpende skanning, native BarcodeDetector der den finnes, ──
+// ── jsQR som fallback (bl.a. Safari/iOS, som mangler BarcodeDetector) ──
+let stream = null, scanInterval = null;
+let seenCodes = new Set();
+let scanCanvas = null, scanCtx = null;
  
 async function startCMFCamera() {
-  const results = document.getElementById('cmf-results');
-  results.innerHTML = '';
-  lastCode = null;
+  const placeholderText = document.getElementById('cam-placeholder-text');
+  if (placeholderText) placeholderText.textContent = 'Starter kamera...';
+  seenCodes = new Set();
+  document.getElementById('cmf-results').innerHTML = '';
  
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -372,42 +366,86 @@ async function startCMFCamera() {
     document.getElementById('cam-overlay').style.display = 'flex';
     const status = document.getElementById('cam-status');
     status.style.display = 'block';
-    document.getElementById('btn-start').style.display = 'none';
-    document.getElementById('btn-stop').style.display = 'flex';
+    status.textContent = '🔍 Hold QR-koden(e) mot kameraet...';
+    const toggleBtn = document.getElementById('btn-toggle-cam');
+    if (toggleBtn) { toggleBtn.textContent = '⏹ Stopp kamera'; toggleBtn.className = 'btn btn-stop'; }
  
-    if ('BarcodeDetector' in window) {
-      let det;
+    const useNative = 'BarcodeDetector' in window;
+    let det = null;
+    if (useNative) {
       try { det = new BarcodeDetector({ formats: ['qr_code','data_matrix','aztec','pdf417'] }); }
       catch(e) { det = new BarcodeDetector(); }
-      status.textContent = '🔍 Hold QR-koden mot den gule rammen...';
-      scanInterval = setInterval(async () => {
-        if (!video.videoWidth) return;
-        try {
-          const codes = await det.detect(video);
-          if (codes.length > 0) {
-            const raw = codes[0].rawValue;
-            if (raw && raw !== lastCode) {
-              lastCode = raw;
-              status.textContent = '✅ Kode lest!';
-              stopCamera();
-              lookupCMF(raw);
-            }
-          }
-        } catch(e) {}
-      }, 250);
+    } else if (typeof jsQR === 'undefined') {
+      status.textContent = '⚠️ Automatisk skanning støttes ikke i denne nettleseren.';
+      return;
     } else {
-      status.textContent = '📸 Pek mot QR-koden og trykk «Ta bilde»';
-      results.innerHTML = `<div class="msg-box" style="padding:12px;font-size:12px;text-align:left;">
-        ℹ️ Automatisk skanning støttes ikke i denne nettleseren. Bruk «Ta bilde»-knappen nedenfor.
-      </div>`;
+      scanCanvas = scanCanvas || document.createElement('canvas');
+      scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
     }
+ 
+    scanInterval = setInterval(async () => {
+      if (!video.videoWidth) return;
+      try {
+        let rawCodes = [];
+        if (useNative) {
+          const codes = await det.detect(video);
+          rawCodes = codes.map(c => c.rawValue).filter(Boolean);
+        } else {
+          scanCanvas.width = video.videoWidth;
+          scanCanvas.height = video.videoHeight;
+          scanCtx.drawImage(video, 0, 0, scanCanvas.width, scanCanvas.height);
+          const imageData = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
+          rawCodes = detectMultipleQR(imageData).map(c => c.data).filter(Boolean);
+        }
+        rawCodes.forEach(raw => handleDetectedCode(raw, status));
+      } catch(e) {}
+    }, 350);
   } catch(e) {
     let msg = e.name === 'NotAllowedError'
-      ? 'Kameratilgang nektet. Gå til Innstillinger → Chrome → Kamera og gi tillatelse.'
+      ? 'Kameratilgang nektet. Gå til innstillingene for nettleseren og gi tillatelse til kamera, trykk deretter «Start kamera» igjen.'
       : e.message;
     document.getElementById('cmf-results').innerHTML = `<div class="msg-box"><div class="mi">🚫</div><strong>Kamera utilgjengelig</strong><br><br>${msg}</div>`;
     resetCamUI();
   }
+}
+ 
+// Kjører jsQR flere ganger på samme bilde – etter hvert treff sverter vi ut
+// området koden ble funnet i, slik at neste kjøring kan finne en annen kode.
+// Dette gir "les flere koder samtidig" selv om jsQR i seg selv kun finner én
+// kode per kall.
+function detectMultipleQR(imageData, maxCodes) {
+  maxCodes = maxCodes || 4;
+  const found = [];
+  const width = imageData.width, height = imageData.height;
+  const data = new Uint8ClampedArray(imageData.data);
+  for (let i = 0; i < maxCodes; i++) {
+    const code = jsQR(data, width, height, { inversionAttempts: 'dontInvert' });
+    if (!code) break;
+    found.push(code);
+    const loc = code.location;
+    const xs = [loc.topLeftCorner.x, loc.topRightCorner.x, loc.bottomLeftCorner.x, loc.bottomRightCorner.x];
+    const ys = [loc.topLeftCorner.y, loc.topRightCorner.y, loc.bottomLeftCorner.y, loc.bottomRightCorner.y];
+    const minX = Math.max(0, Math.floor(Math.min.apply(null, xs)) - 6);
+    const maxX = Math.min(width, Math.ceil(Math.max.apply(null, xs)) + 6);
+    const minY = Math.max(0, Math.floor(Math.min.apply(null, ys)) - 6);
+    const maxY = Math.min(height, Math.ceil(Math.max.apply(null, ys)) + 6);
+    for (let y = minY; y < maxY; y++) {
+      for (let x = minX; x < maxX; x++) {
+        const idx = (y * width + x) * 4;
+        data[idx] = 0; data[idx + 1] = 0; data[idx + 2] = 0; data[idx + 3] = 255;
+      }
+    }
+  }
+  return found;
+}
+ 
+function handleDetectedCode(raw, statusEl) {
+  const nums = raw.match(/\d{7}/g) || [];
+  const key = nums.find(n => CMF_DB[n]) || nums[0] || raw.trim();
+  if (!key || seenCodes.has(key)) return;
+  seenCodes.add(key);
+  if (statusEl) statusEl.textContent = '✅ Kode lest! Fortsetter å skanne...';
+  addCMFResult(raw);
 }
  
 function stopCamera() {
@@ -421,47 +459,21 @@ function resetCamUI() {
   v.style.display = 'none'; v.srcObject = null;
   document.getElementById('cam-overlay').style.display = 'none';
   document.getElementById('cam-status').style.display = 'none';
+  const placeholderText = document.getElementById('cam-placeholder-text');
+  if (placeholderText) placeholderText.textContent = 'Trykk «Start kamera»';
   document.getElementById('cam-placeholder').style.display = 'flex';
-  document.getElementById('btn-start').style.display = 'flex';
-  document.getElementById('btn-stop').style.display = 'none';
+  const toggleBtn = document.getElementById('btn-toggle-cam');
+  if (toggleBtn) { toggleBtn.textContent = '📷 Start kamera'; toggleBtn.className = 'btn btn-red'; }
 }
  
-async function scanCMFFromImage(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const results = document.getElementById('cmf-results');
-  results.innerHTML = `<div class="loading"><div class="spinner"></div>Leser QR-kode fra bilde...</div>`;
- 
-  if (!('BarcodeDetector' in window)) {
-    results.innerHTML = `<div class="msg-box"><div class="mi">⚠️</div>Automatisk kodelesing støttes ikke i Safari. Bruk kamera-appen din, kopier teksten fra QR-koden, og lim den inn i feltet ovenfor.</div>`;
-    return;
-  }
-  const img = new Image();
-  img.src = URL.createObjectURL(file);
-  await new Promise(r => { img.onload = r; });
-  try {
-    let det;
-    try { det = new BarcodeDetector({ formats: ['qr_code','data_matrix','aztec'] }); }
-    catch(e) { det = new BarcodeDetector(); }
-    const codes = await det.detect(img);
-    if (codes.length > 0) {
-      lookupCMF(codes[0].rawValue);
-    } else {
-      results.innerHTML = `<div class="msg-box"><div class="mi">🤔</div>Fant ingen QR-kode. Prøv et tydeligere bilde – dekk til strekkoden med fingeren slik at bare den kvadratiske koden er synlig.</div>`;
-    }
-  } catch(e) {
-    results.innerHTML = `<div class="msg-box"><div class="mi">⚠️</div>${e.message}</div>`;
-  }
+function toggleCMFCamera() {
+  if (stream) stopCamera(); else startCMFCamera();
 }
  
-function lookupCMFManual() {
-  const val = document.getElementById('manual-cmf').value.trim();
-  if (val) lookupCMF(val);
-}
- 
-// ── CMF Lookup from database ───────────────────────────────
-function lookupCMF(rawCode) {
-  const results = document.getElementById('cmf-results');
+// ── CMF Lookup from database – legger til et kort i listen for hver ──
+// ── nye kode som blir funnet, uten å fjerne tidligere treff ──────────
+function addCMFResult(rawCode) {
+  const list = document.getElementById('cmf-results');
  
   // Extract all 7-digit numbers from the raw code
   const nums = rawCode.match(/\d{7}/g) || [];
@@ -476,19 +488,18 @@ function lookupCMF(rawCode) {
     match = CMF_DB[rawCode.trim()];
   }
  
+  const card = document.createElement('div');
   if (match) {
-    const setNum = match.series.match(/\d{5}/)?.[0] || '';
     const blNum  = match.num; // e.g. col27-3
     const rbUrl  = `https://rebrickable.com/minifigs/${blNum}/`;
     const blUrl  = `https://www.bricklink.com/v2/catalog/catalogitem.page?M=${blNum}`;
     const imgUrl = `https://rebrickable.com/media/minifigs/${blNum}.jpg`;
  
-    results.innerHTML = `
+    card.innerHTML = `
       <div class="found-badge">✅ Figur funnet!</div>
       <div class="result-card">
         <img class="result-img" src="${imgUrl}" alt="${match.name}"
-          onerror="this.src='https://img.bricklink.com/ItemImage/MN/0/${blNum}.png'"
-          onerror="this.style.display='none'">
+          onerror="this.onerror=null;this.src='https://img.bricklink.com/ItemImage/MN/0/${blNum}.png'">
         <div class="result-body">
           <div class="result-name">${match.name}</div>
           <div class="result-meta">${match.series}</div>
@@ -505,7 +516,7 @@ function lookupCMF(rawCode) {
   } else {
     // Show raw code and links to external scanners
     const shortCode = nums[0] || rawCode.substring(0, 30);
-    results.innerHTML = `
+    card.innerHTML = `
       <div class="banner">🔎 Kode: ${shortCode}</div>
       <div class="msg-box">
         <div class="mi">🤔</div>
@@ -517,6 +528,7 @@ function lookupCMF(rawCode) {
         <div style="font-size:10px;color:var(--muted);margin-top:8px;word-break:break-all;">Råkode: ${rawCode.substring(0,80)}</div>
       </div>`;
   }
+  list.prepend(card);
 }
  
 // ── Brick scan (Brickognize, via Netlify-funksjon for å unngå CORS) ─
@@ -830,10 +842,24 @@ function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
 }
  
 // ── PWA: registrer service worker (gjør appen installerbar) ─
+// Når en ny service worker overtar (etter en ny utrulling), laster vi
+// siden på nytt automatisk én gang, slik at nye endringer alltid vises
+// uten at man må huske å tvinge en oppdatering manuelt.
 if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!window.__reloadedForSWUpdate) {
+      window.__reloadedForSWUpdate = true;
+      window.location.reload();
+    }
+  });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
+}
+ 
+// ── Start kameraet automatisk hvis Minifig box scanner-fanen er åpen ──
+if (document.getElementById('tab-cmf').classList.contains('active')) {
+  startCMFCamera();
 }
 </script>
 </body>
