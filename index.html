@@ -18,8 +18,9 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;max-width:480px;margin:0 auto;overflow-x:hidden;}
 .header{background:var(--dark);padding:16px 20px 12px;position:sticky;top:0;z-index:100;}
-.logo{font-size:24px;font-weight:900;color:var(--yellow);}
+.logo{font-size:24px;font-weight:900;color:var(--yellow);display:flex;align-items:center;gap:8px;}
 .logo span{color:var(--red);}
+.logo-icon{width:26px;height:26px;border-radius:7px;object-fit:cover;}
 .logo-sub{font-size:11px;color:rgba(255,255,255,.4);font-family:'Space Mono',monospace;margin-top:2px;}
 .tabs{display:flex;background:var(--dark);padding:0 12px 12px;gap:8px;}
 .tab{flex:1;padding:10px 4px;border-radius:12px;border:none;background:rgba(255,255,255,.08);color:rgba(255,255,255,.5);font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:3px;}
@@ -108,7 +109,7 @@ a{color:var(--blue);}
 <body>
  
 <div class="header">
-  <div class="logo">Milli<span>Brick</span> 🧱</div>
+  <div class="logo">Milli<span>Brick</span> <img src="/icons/icon-192.png" alt="MilliBrick" class="logo-icon"></div>
   <div class="logo-sub">Din familie-LEGO-assistent</div>
 </div>
  
@@ -125,8 +126,7 @@ a{color:var(--blue);}
     <div class="section-title">🎭 Minifig box scanner</div>
     <p class="section-sub">Hold <strong>bunnen av CMF-boksen</strong> mot kameraet – koden(e) leses automatisk. Du trenger ikke å ta bilde selv.</p>
     <div class="tip-box">
-      📦 <strong>Slik gjør du det:</strong><br>
-      Snu boksen. Du ser to koder – dekk til den vanlige strekkoden til venstre med fingeren, og hold den <strong>kvadratiske QR-koden til høyre</strong> mot kamerarammen. Hold boksen ca. 10–15 cm fra kameraet. Kameraet skanner løpende – hold gjerne flere bokser opp etter hverandre (eller flere i bildet samtidig). Navn og bilde vises i kamerabildet så lenge koden er synlig, og forsvinner igjen når du flytter boksen bort.
+      📦 Vis QR koden til kameraet
     </div>
     <div class="cam-wrap" id="cam-wrap">
       <div class="cam-placeholder" id="cam-placeholder">
@@ -356,7 +356,7 @@ function switchTab(name) {
 // ── jsQR som fallback (bl.a. Safari/iOS, som mangler BarcodeDetector) ──
 let stream = null, scanInterval = null;
 let liveMatches = new Map(); // kode-nøkkel → { match, rawCode, ts }
-const LIVE_TIMEOUT_MS = 900; // hvor lenge en kode "henger igjen" etter siste treff, for å unngå flimring
+const LIVE_TIMEOUT_MS = 2500; // hvor lenge en kode "henger igjen" (et par sekunder) etter siste treff, for å unngå flimring
 let scanCanvas = null, scanCtx = null;
 let currentFacingMode = 'environment';
  
@@ -369,13 +369,12 @@ async function startCMFCamera() {
   const placeholderText = document.getElementById('cam-placeholder-text');
   if (placeholderText) placeholderText.textContent = 'Starter kamera...';
   liveMatches = new Map();
+  lastRenderedKeys = '';
   document.getElementById('cmf-results').innerHTML = '';
   document.getElementById('cam-live-list').innerHTML = '';
  
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: currentFacingMode }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-    });
+    stream = await openCameraStream(currentFacingMode);
     const video = document.getElementById('cam-video');
     video.srcObject = stream;
     applyVideoMirror();
@@ -481,12 +480,20 @@ function handleDetectedCode(raw) {
  
 // Fjerner koder som ikke er sett på en liten stund (koden er ikke lenger i
 // bildet), og tegner opp listen med kun det som er synlig akkurat nå.
+// Tegner kun på nytt når settet med synlige koder faktisk har endret seg –
+// ellers ville bildene blitt bygget opp igjen (og dermed blinket) hver
+// eneste skanne-tick, selv når det er nøyaktig samme kode som fortsatt vises.
+let lastRenderedKeys = '';
 function purgeAndRenderLive() {
   const now = Date.now();
   for (const [key, entry] of liveMatches) {
     if (now - entry.ts > LIVE_TIMEOUT_MS) liveMatches.delete(key);
   }
-  renderLiveMatches();
+  const currentKeys = [...liveMatches.keys()].sort().join('|');
+  if (currentKeys !== lastRenderedKeys) {
+    renderLiveMatches();
+    lastRenderedKeys = currentKeys;
+  }
 }
  
 function renderLiveMatches() {
@@ -540,6 +547,7 @@ function resetCamUI() {
   document.getElementById('cam-status').style.display = 'none';
   document.getElementById('btn-flip-cam').style.display = 'none';
   liveMatches = new Map();
+  lastRenderedKeys = '';
   const liveList = document.getElementById('cam-live-list');
   if (liveList) liveList.innerHTML = '';
   const placeholderText = document.getElementById('cam-placeholder-text');
@@ -553,35 +561,56 @@ function toggleCMFCamera() {
   if (stream) stopCamera(); else startCMFCamera();
 }
  
+// Prøver flere sett med constraints, fra strengest til løsest, siden mange
+// (spesielt front-)kameraer på Android feiler på faste bredde/høyde-krav.
+async function openCameraStream(facingMode) {
+  const attempts = [
+    { video: { facingMode: { exact: facingMode }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+    { video: { facingMode: { ideal: facingMode } } },
+    { video: { facingMode } },
+    { video: true },
+  ];
+  let lastErr;
+  for (const constraints of attempts) {
+    try { return await navigator.mediaDevices.getUserMedia(constraints); }
+    catch (e) { lastErr = e; }
+  }
+  throw lastErr;
+}
+ 
 // Bytter mellom bak- og frontkamera uten å nullstille skanne-historikken
 // (nyttig for å skanne bokser som henger på pegg, ved å vinkle telefonen
 // annerledes uten å måtte ta boksene ned).
 async function flipCamera() {
   if (!stream) return;
   const previousMode = currentFacingMode;
-  currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+  const nextMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+  const status = document.getElementById('cam-status');
+  const video = document.getElementById('cam-video');
+ 
   stream.getTracks().forEach(t => t.stop());
+  // Gi enheten litt tid til å faktisk slippe kameraet før vi ber om et nytt
+  await new Promise(r => setTimeout(r, 200));
+ 
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: currentFacingMode }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-    });
-    const video = document.getElementById('cam-video');
+    stream = await openCameraStream(nextMode);
+    currentFacingMode = nextMode;
     video.srcObject = stream;
     applyVideoMirror();
     await video.play();
+    if (status) status.textContent = '🔍 Hold QR-koden(e) mot kameraet...';
   } catch(e) {
-    currentFacingMode = previousMode;
-    const status = document.getElementById('cam-status');
-    if (status) status.textContent = '⚠️ Kunne ikke bytte kamera: ' + e.message;
+    if (status) status.textContent = `⚠️ Fikk ikke tilgang til ${nextMode === 'user' ? 'frontkamera' : 'bakkamera'}. Bytter tilbake...`;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: currentFacingMode }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-      });
-      const video = document.getElementById('cam-video');
+      stream = await openCameraStream(previousMode);
+      currentFacingMode = previousMode;
       video.srcObject = stream;
       applyVideoMirror();
       await video.play();
-    } catch(e2) { stopCamera(); }
+      if (status) status.textContent = '🔍 Hold QR-koden(e) mot kameraet...';
+    } catch(e2) {
+      stopCamera();
+    }
   }
 }
  
