@@ -551,20 +551,29 @@ async function handleScanImage(event) {
 }
  
 // Brickognize gir type: "part" | "set" | "fig" | "sticker", og som regel
-// en ferdig external_sites-liste med riktig lenke (f.eks. BrickLink med
-// S= for sett og P= for deler). Vi bruker den når den finnes, og bygger
-// bare lenken selv som fallback – basert på type, ikke på hvordan id-en
-// ser ut (et settnummer som "40519-1" er IKKE en del, selv om det bare
-// er tall og bindestrek).
+// en ferdig external_sites-liste med riktig lenke. Vi bruker den når den
+// finnes (mest pålitelig), og kombinerer type med hvordan selve id-en ser
+// ut som fallback – "type" alene har vist seg upålitelig i praksis.
 function itemLinkUrl(item) {
   const sites = item.external_sites || [];
   const bricklink = sites.find(s => (s.name||'').toLowerCase().includes('bricklink'));
   if (bricklink?.url) return bricklink.url;
   if (sites[0]?.url) return sites[0].url;
  
+  // BrickLinks egne id-konvensjoner er ganske faste:
+  //   sett:      tall-tall, f.eks. "40519-1"       → S=
+  //   minifigur: bokstav(er)+tall, f.eks. "lor146"  → M=
+  //   del:       rene tall, evt. med bokstavsuffiks → P=
   const id = item.id || '';
-  if (item.type === 'fig') return `https://rebrickable.com/minifigs/${id}/`;
-  if (item.type === 'set') return `https://www.bricklink.com/v2/catalog/catalogitem.page?S=${id}`;
+  const looksLikeSet = /^\d+-\d+$/.test(id);
+  const looksLikePart = /^\d+[a-z]{0,3}\d*$/i.test(id);
+ 
+  if (item.type === 'set' || looksLikeSet) {
+    return `https://www.bricklink.com/v2/catalog/catalogitem.page?S=${id}`;
+  }
+  if (item.type === 'fig' || (!looksLikePart && !looksLikeSet)) {
+    return `https://www.bricklink.com/v2/catalog/catalogitem.page?M=${id}`;
+  }
   return `https://www.bricklink.com/v2/catalog/catalogitem.page?P=${id}`;
 }
  
@@ -829,6 +838,3 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
- 
- 
- 
