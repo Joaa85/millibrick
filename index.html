@@ -46,11 +46,13 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .cam-status{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;font-weight:800;color:#fff;font-family:'Space Mono',monospace;text-shadow:0 1px 4px rgba(0,0,0,.9);padding:0 12px;}
 .cam-flip-btn{position:absolute;top:10px;right:10px;z-index:6;width:38px;height:38px;border-radius:50%;border:none;background:rgba(13,13,26,.6);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px);}
 .cam-flip-btn:active{transform:scale(.92);}
-.cam-found-toast{position:absolute;top:0;left:0;right:0;z-index:5;background:linear-gradient(180deg,rgba(13,13,26,.92),rgba(13,13,26,.55));padding:10px 44px 10px 10px;display:flex;align-items:center;gap:10px;animation:up .25s ease;}
-.cam-found-toast img{width:44px;height:44px;object-fit:contain;border-radius:8px;background:#fff;flex-shrink:0;border:1px solid rgba(255,255,255,.2);}
-.cam-found-toast .cam-found-info{min-width:0;}
-.cam-found-toast .cfn{font-weight:800;font-size:13px;line-height:1.25;color:#fff;}
-.cam-found-toast .cfs{font-size:10px;color:rgba(255,255,255,.75);font-family:'Space Mono',monospace;margin-top:2px;}
+.cam-live-list{position:absolute;top:0;left:0;right:44px;z-index:5;display:flex;flex-direction:column;gap:6px;padding:8px;pointer-events:none;max-height:100%;overflow:hidden;}
+.cam-live-item{display:flex;align-items:center;gap:10px;background:rgba(13,13,26,.88);backdrop-filter:blur(3px);border-radius:10px;padding:6px 10px;animation:up .2s ease;}
+.cam-live-item img{width:38px;height:38px;object-fit:contain;border-radius:8px;background:#fff;flex-shrink:0;}
+.cam-live-item .clin{min-width:0;}
+.cam-live-item .cln{font-weight:800;font-size:12.5px;color:#fff;line-height:1.2;}
+.cam-live-item .cls{font-size:10px;color:rgba(255,255,255,.75);font-family:'Space Mono',monospace;margin-top:1px;}
+.cam-live-item.notfound .cln{color:#FFD700;}
 .btn{width:100%;padding:13px;border-radius:12px;border:none;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;}
 .btn:active{transform:scale(.97);}
 .btn-red{background:var(--red);color:#fff;}
@@ -124,7 +126,7 @@ a{color:var(--blue);}
     <p class="section-sub">Hold <strong>bunnen av CMF-boksen</strong> mot kameraet – koden(e) leses automatisk. Du trenger ikke å ta bilde selv.</p>
     <div class="tip-box">
       📦 <strong>Slik gjør du det:</strong><br>
-      Snu boksen. Du ser to koder – dekk til den vanlige strekkoden til venstre med fingeren, og hold den <strong>kvadratiske QR-koden til høyre</strong> mot kamerarammen. Hold boksen ca. 10–15 cm fra kameraet. Kameraet skanner løpende – hold gjerne flere bokser opp etter hverandre (eller flere i bildet samtidig), så dukker alle figurene som blir funnet opp i listen under.
+      Snu boksen. Du ser to koder – dekk til den vanlige strekkoden til venstre med fingeren, og hold den <strong>kvadratiske QR-koden til høyre</strong> mot kamerarammen. Hold boksen ca. 10–15 cm fra kameraet. Kameraet skanner løpende – hold gjerne flere bokser opp etter hverandre (eller flere i bildet samtidig). Navn og bilde vises i kamerabildet så lenge koden er synlig, og forsvinner igjen når du flytter boksen bort.
     </div>
     <div class="cam-wrap" id="cam-wrap">
       <div class="cam-placeholder" id="cam-placeholder">
@@ -133,13 +135,7 @@ a{color:var(--blue);}
       </div>
       <video id="cam-video" style="display:none;width:100%;height:100%;object-fit:cover;" autoplay muted playsinline></video>
       <button class="cam-flip-btn" id="btn-flip-cam" onclick="flipCamera()" title="Bytt kamera (front/bak)" style="display:none;">🔄</button>
-      <div class="cam-found-toast" id="cam-found-toast" style="display:none;">
-        <img id="cam-found-img" src="" alt="">
-        <div class="cam-found-info">
-          <div class="cfn" id="cam-found-name"></div>
-          <div class="cfs" id="cam-found-series"></div>
-        </div>
-      </div>
+      <div class="cam-live-list" id="cam-live-list"></div>
       <div class="cam-overlay" id="cam-overlay" style="display:none;">
         <div class="cam-frame"><div class="scan-pulse"></div></div>
       </div>
@@ -359,7 +355,8 @@ function switchTab(name) {
 // ── Camera: løpende skanning, native BarcodeDetector der den finnes, ──
 // ── jsQR som fallback (bl.a. Safari/iOS, som mangler BarcodeDetector) ──
 let stream = null, scanInterval = null;
-let seenCodes = new Set();
+let liveMatches = new Map(); // kode-nøkkel → { match, rawCode, ts }
+const LIVE_TIMEOUT_MS = 900; // hvor lenge en kode "henger igjen" etter siste treff, for å unngå flimring
 let scanCanvas = null, scanCtx = null;
 let currentFacingMode = 'environment';
  
@@ -371,9 +368,9 @@ function applyVideoMirror() {
 async function startCMFCamera() {
   const placeholderText = document.getElementById('cam-placeholder-text');
   if (placeholderText) placeholderText.textContent = 'Starter kamera...';
-  seenCodes = new Set();
+  liveMatches = new Map();
   document.getElementById('cmf-results').innerHTML = '';
-  document.getElementById('cam-found-toast').style.display = 'none';
+  document.getElementById('cam-live-list').innerHTML = '';
  
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -421,7 +418,11 @@ async function startCMFCamera() {
           const imageData = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
           rawCodes = detectMultipleQR(imageData).map(c => c.data).filter(Boolean);
         }
-        rawCodes.forEach(raw => handleDetectedCode(raw, status));
+        rawCodes.forEach(raw => handleDetectedCode(raw));
+        purgeAndRenderLive();
+        status.textContent = rawCodes.length
+          ? '✅ Kode lest! Fortsetter å skanne...'
+          : '🔍 Hold QR-koden(e) mot kameraet...';
       } catch(e) {}
     }, 350);
   } catch(e) {
@@ -463,13 +464,67 @@ function detectMultipleQR(imageData, maxCodes) {
   return found;
 }
  
-function handleDetectedCode(raw, statusEl) {
+// Oppdaterer/fornyer "sist sett"-tidspunktet for en kode – selve
+// fjerning-når-ute-av-syne skjer i purgeAndRenderLive(), som kjøres hver
+// skanne-tick uansett om noe nytt ble funnet eller ikke.
+function handleDetectedCode(raw) {
   const nums = raw.match(/\d{7}/g) || [];
   const key = nums.find(n => CMF_DB[n]) || nums[0] || raw.trim();
-  if (!key || seenCodes.has(key)) return;
-  seenCodes.add(key);
-  if (statusEl) statusEl.textContent = '✅ Kode lest! Fortsetter å skanne...';
-  addCMFResult(raw);
+  if (!key) return;
+ 
+  let match = null;
+  for (const n of nums) { if (CMF_DB[n]) { match = CMF_DB[n]; break; } }
+  if (!match && CMF_DB[raw.trim()]) match = CMF_DB[raw.trim()];
+ 
+  liveMatches.set(key, { match, rawCode: raw, ts: Date.now() });
+}
+ 
+// Fjerner koder som ikke er sett på en liten stund (koden er ikke lenger i
+// bildet), og tegner opp listen med kun det som er synlig akkurat nå.
+function purgeAndRenderLive() {
+  const now = Date.now();
+  for (const [key, entry] of liveMatches) {
+    if (now - entry.ts > LIVE_TIMEOUT_MS) liveMatches.delete(key);
+  }
+  renderLiveMatches();
+}
+ 
+function renderLiveMatches() {
+  const list = document.getElementById('cam-live-list');
+  if (!list) return;
+  if (liveMatches.size === 0) { list.innerHTML = ''; return; }
+  list.innerHTML = [...liveMatches.values()].map(entry => {
+    if (entry.match) {
+      const imgUrl = cmfImageUrl(entry.match);
+      return `<div class="cam-live-item">
+        ${imgUrl ? `<img src="${imgUrl}" alt="${entry.match.name}" onerror="this.style.display='none'">` : ''}
+        <div class="clin">
+          <div class="cln">✅ ${entry.match.name}</div>
+          <div class="cls">${entry.match.series}</div>
+        </div>
+      </div>`;
+    }
+    const nums = entry.rawCode.match(/\d{7}/g) || [];
+    const shortCode = nums[0] || entry.rawCode.substring(0, 20);
+    return `<div class="cam-live-item notfound">
+      <div class="clin">
+        <div class="cln">🤔 Ukjent kode</div>
+        <div class="cls">${shortCode}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+ 
+// Bygger en bilde-URL fra LEGOs egen samlernummerering (f.eks. "col25-1" →
+// serie 25, figur 1; "coldnd-3" → D&D, figur 3), basert på det statiske
+// bildearkivet til minifigurescanner.com.
+function cmfImageUrl(match) {
+  const m = (match.num || '').match(/^col(\w+?)-(\d+)$/);
+  if (!m) return null;
+  const seriesKey = m[1];
+  const pos = m[2];
+  const slug = seriesKey === 'dnd' ? 'dungeons-dragons' : `series${seriesKey}`;
+  return `https://minifigurescanner.com/cmf/${slug}/${pos}.webp`;
 }
  
 function stopCamera() {
@@ -484,7 +539,9 @@ function resetCamUI() {
   document.getElementById('cam-overlay').style.display = 'none';
   document.getElementById('cam-status').style.display = 'none';
   document.getElementById('btn-flip-cam').style.display = 'none';
-  document.getElementById('cam-found-toast').style.display = 'none';
+  liveMatches = new Map();
+  const liveList = document.getElementById('cam-live-list');
+  if (liveList) liveList.innerHTML = '';
   const placeholderText = document.getElementById('cam-placeholder-text');
   if (placeholderText) placeholderText.textContent = 'Trykk «Start kamera»';
   document.getElementById('cam-placeholder').style.display = 'flex';
@@ -526,93 +583,6 @@ async function flipCamera() {
       await video.play();
     } catch(e2) { stopCamera(); }
   }
-}
- 
-// ── CMF Lookup from database – legger til et kort i listen for hver ──
-// ── nye kode som blir funnet, uten å fjerne tidligere treff ──────────
-function addCMFResult(rawCode) {
-  const list = document.getElementById('cmf-results');
- 
-  // Extract all 7-digit numbers from the raw code
-  const nums = rawCode.match(/\d{7}/g) || [];
- 
-  let match = null;
-  for (const n of nums) {
-    if (CMF_DB[n]) { match = CMF_DB[n]; break; }
-  }
- 
-  // Also try full string match if it's exactly 7 digits
-  if (!match && CMF_DB[rawCode.trim()]) {
-    match = CMF_DB[rawCode.trim()];
-  }
- 
-  showCamFoundToast(match, nums[0] || rawCode.substring(0, 20));
- 
-  const card = document.createElement('div');
-  if (match) {
-    const blNum  = match.num; // e.g. col27-3
-    const rbUrl  = `https://rebrickable.com/minifigs/${blNum}/`;
-    const blUrl  = `https://www.bricklink.com/v2/catalog/catalogitem.page?M=${blNum}`;
-    const imgUrl = `https://rebrickable.com/media/minifigs/${blNum}.jpg`;
- 
-    card.innerHTML = `
-      <div class="found-badge">✅ Figur funnet!</div>
-      <div class="result-card">
-        <img class="result-img" src="${imgUrl}" alt="${match.name}"
-          onerror="this.onerror=null;this.src='https://img.bricklink.com/ItemImage/MN/0/${blNum}.png'">
-        <div class="result-body">
-          <div class="result-name">${match.name}</div>
-          <div class="result-meta">${match.series}</div>
-          <div>
-            <span class="badge b-blue">🎭 CMF</span>
-            <span class="badge b-yellow">${match.num}</span>
-          </div>
-          <div class="mt8" style="display:flex;gap:14px;flex-wrap:wrap;">
-            <a href="${blUrl}" target="_blank" style="font-size:13px;font-weight:800;">🔗 BrickLink</a>
-            <a href="${rbUrl}" target="_blank" style="font-size:13px;font-weight:800;">🔗 Rebrickable</a>
-          </div>
-        </div>
-      </div>`;
-  } else {
-    // Show raw code and links to external scanners
-    const shortCode = nums[0] || rawCode.substring(0, 30);
-    card.innerHTML = `
-      <div class="banner">🔎 Kode: ${shortCode}</div>
-      <div class="msg-box">
-        <div class="mi">🤔</div>
-        <strong>Koden er ikke i databasen ennå.</strong><br><br>
-        Støttede serier: Series 25–29, D&D.<br><br>
-        Prøv disse verktøyene for nyere serier:<br><br>
-        <a href="https://falconbricks.com/figure-finder/" target="_blank">🔗 Falconbricks Figure Finder</a><br><br>
-        <a href="https://brickbank.app/en/cmf/scanner/" target="_blank">🔗 Brickbank CMF Scanner</a><br><br>
-        <div style="font-size:10px;color:var(--muted);margin-top:8px;word-break:break-all;">Råkode: ${rawCode.substring(0,80)}</div>
-      </div>`;
-  }
-  list.prepend(card);
-}
- 
-// Viser siste funn øverst i selve kamerabildet med én gang, slik at man
-// ikke trenger å scrolle ned til listen for å se hvilken figur det var.
-function showCamFoundToast(match, shortCode) {
-  const toast = document.getElementById('cam-found-toast');
-  const img = document.getElementById('cam-found-img');
-  const nameEl = document.getElementById('cam-found-name');
-  const seriesEl = document.getElementById('cam-found-series');
-  if (!toast) return;
- 
-  if (match) {
-    const blNum = match.num;
-    img.style.display = 'block';
-    img.src = `https://rebrickable.com/media/minifigs/${blNum}.jpg`;
-    img.onerror = () => { img.onerror = null; img.src = `https://img.bricklink.com/ItemImage/MN/0/${blNum}.png`; };
-    nameEl.textContent = '✅ ' + match.name;
-    seriesEl.textContent = match.series;
-  } else {
-    img.style.display = 'none';
-    nameEl.textContent = '🤔 Ukjent kode';
-    seriesEl.textContent = shortCode || '';
-  }
-  toast.style.display = 'flex';
 }
  
 // ── Brick scan (Brickognize, via Netlify-funksjon for å unngå CORS) ─
