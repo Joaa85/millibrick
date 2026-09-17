@@ -550,6 +550,24 @@ async function handleScanImage(event) {
   }
 }
  
+// Brickognize gir type: "part" | "set" | "fig" | "sticker", og som regel
+// en ferdig external_sites-liste med riktig lenke (f.eks. BrickLink med
+// S= for sett og P= for deler). Vi bruker den når den finnes, og bygger
+// bare lenken selv som fallback – basert på type, ikke på hvordan id-en
+// ser ut (et settnummer som "40519-1" er IKKE en del, selv om det bare
+// er tall og bindestrek).
+function itemLinkUrl(item) {
+  const sites = item.external_sites || [];
+  const bricklink = sites.find(s => (s.name||'').toLowerCase().includes('bricklink'));
+  if (bricklink?.url) return bricklink.url;
+  if (sites[0]?.url) return sites[0].url;
+ 
+  const id = item.id || '';
+  if (item.type === 'fig') return `https://rebrickable.com/minifigs/${id}/`;
+  if (item.type === 'set') return `https://www.bricklink.com/v2/catalog/catalogitem.page?S=${id}`;
+  return `https://www.bricklink.com/v2/catalog/catalogitem.page?P=${id}`;
+}
+ 
 function showScanResults(items) {
   const results = document.getElementById('scan-results');
   const top = items.slice(0,6);
@@ -559,15 +577,7 @@ function showScanResults(items) {
     const name = item.name||item.id||'Ukjent';
     const img  = item.img_url||'';
     const id   = item.id||'';
-    // Fix BrickLink URL: minifigs start with "fig-", parts are just numbers
-    const isMinifig = id.toLowerCase().startsWith('fig');
-    let blUrl;
-    if (isMinifig) {
-      // Rebrickable fig-001234 → BrickLink col-something: use Rebrickable instead
-      blUrl = `https://rebrickable.com/minifigs/${id}/`;
-    } else {
-      blUrl = `https://www.bricklink.com/v2/catalog/catalogitem.page?P=${id}`;
-    }
+    const blUrl = itemLinkUrl(item);
     html += `<div class="mf-card" onclick="window.open('${blUrl}','_blank')">
       ${img?`<img src="${img}" alt="${name}" onerror="this.style.display='none'">`:'<div style="font-size:36px;margin-bottom:8px;">🧱</div>'}
       <div class="mf-cname">${name}</div>
@@ -577,9 +587,7 @@ function showScanResults(items) {
     </div>`;
   });
   const first = top[0];
-  const firstUrl = first?.id?.toLowerCase().startsWith('fig')
-    ? `https://rebrickable.com/minifigs/${first.id}/`
-    : `https://www.bricklink.com/v2/catalog/catalogitem.page?P=${first?.id}`;
+  const firstUrl = first ? itemLinkUrl(first) : '#';
   html += `</div><div class="mt16"><a href="${firstUrl}" target="_blank" class="btn btn-outline" style="text-decoration:none;">🔗 Se sett og pris</a></div>`;
   results.innerHTML = html;
 }
@@ -821,5 +829,6 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
+ 
  
  
