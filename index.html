@@ -44,6 +44,13 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .scan-pulse{position:absolute;inset:-4px;border-radius:12px;border:2px solid var(--yellow);opacity:0;animation:pulse 2s ease-in-out infinite;}
 @keyframes pulse{0%,100%{opacity:0}50%{opacity:.5}}
 .cam-status{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;font-weight:800;color:#fff;font-family:'Space Mono',monospace;text-shadow:0 1px 4px rgba(0,0,0,.9);padding:0 12px;}
+.cam-flip-btn{position:absolute;top:10px;right:10px;z-index:6;width:38px;height:38px;border-radius:50%;border:none;background:rgba(13,13,26,.6);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px);}
+.cam-flip-btn:active{transform:scale(.92);}
+.cam-found-toast{position:absolute;top:0;left:0;right:0;z-index:5;background:linear-gradient(180deg,rgba(13,13,26,.92),rgba(13,13,26,.55));padding:10px 44px 10px 10px;display:flex;align-items:center;gap:10px;animation:up .25s ease;}
+.cam-found-toast img{width:44px;height:44px;object-fit:contain;border-radius:8px;background:#fff;flex-shrink:0;border:1px solid rgba(255,255,255,.2);}
+.cam-found-toast .cam-found-info{min-width:0;}
+.cam-found-toast .cfn{font-weight:800;font-size:13px;line-height:1.25;color:#fff;}
+.cam-found-toast .cfs{font-size:10px;color:rgba(255,255,255,.75);font-family:'Space Mono',monospace;margin-top:2px;}
 .btn{width:100%;padding:13px;border-radius:12px;border:none;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;}
 .btn:active{transform:scale(.97);}
 .btn-red{background:var(--red);color:#fff;}
@@ -125,6 +132,14 @@ a{color:var(--blue);}
         <p id="cam-placeholder-text">Starter kamera...</p>
       </div>
       <video id="cam-video" style="display:none;width:100%;height:100%;object-fit:cover;" autoplay muted playsinline></video>
+      <button class="cam-flip-btn" id="btn-flip-cam" onclick="flipCamera()" title="Bytt kamera (front/bak)" style="display:none;">🔄</button>
+      <div class="cam-found-toast" id="cam-found-toast" style="display:none;">
+        <img id="cam-found-img" src="" alt="">
+        <div class="cam-found-info">
+          <div class="cfn" id="cam-found-name"></div>
+          <div class="cfs" id="cam-found-series"></div>
+        </div>
+      </div>
       <div class="cam-overlay" id="cam-overlay" style="display:none;">
         <div class="cam-frame"><div class="scan-pulse"></div></div>
       </div>
@@ -346,24 +361,33 @@ function switchTab(name) {
 let stream = null, scanInterval = null;
 let seenCodes = new Set();
 let scanCanvas = null, scanCtx = null;
+let currentFacingMode = 'environment';
+ 
+function applyVideoMirror() {
+  const video = document.getElementById('cam-video');
+  video.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'none';
+}
  
 async function startCMFCamera() {
   const placeholderText = document.getElementById('cam-placeholder-text');
   if (placeholderText) placeholderText.textContent = 'Starter kamera...';
   seenCodes = new Set();
   document.getElementById('cmf-results').innerHTML = '';
+  document.getElementById('cam-found-toast').style.display = 'none';
  
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+      video: { facingMode: { ideal: currentFacingMode }, width: { ideal: 1920 }, height: { ideal: 1080 } }
     });
     const video = document.getElementById('cam-video');
     video.srcObject = stream;
+    applyVideoMirror();
     await video.play();
  
     document.getElementById('cam-placeholder').style.display = 'none';
     video.style.display = 'block';
     document.getElementById('cam-overlay').style.display = 'flex';
+    document.getElementById('btn-flip-cam').style.display = 'flex';
     const status = document.getElementById('cam-status');
     status.style.display = 'block';
     status.textContent = '🔍 Hold QR-koden(e) mot kameraet...';
@@ -459,6 +483,8 @@ function resetCamUI() {
   v.style.display = 'none'; v.srcObject = null;
   document.getElementById('cam-overlay').style.display = 'none';
   document.getElementById('cam-status').style.display = 'none';
+  document.getElementById('btn-flip-cam').style.display = 'none';
+  document.getElementById('cam-found-toast').style.display = 'none';
   const placeholderText = document.getElementById('cam-placeholder-text');
   if (placeholderText) placeholderText.textContent = 'Trykk «Start kamera»';
   document.getElementById('cam-placeholder').style.display = 'flex';
@@ -468,6 +494,38 @@ function resetCamUI() {
  
 function toggleCMFCamera() {
   if (stream) stopCamera(); else startCMFCamera();
+}
+ 
+// Bytter mellom bak- og frontkamera uten å nullstille skanne-historikken
+// (nyttig for å skanne bokser som henger på pegg, ved å vinkle telefonen
+// annerledes uten å måtte ta boksene ned).
+async function flipCamera() {
+  if (!stream) return;
+  const previousMode = currentFacingMode;
+  currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+  stream.getTracks().forEach(t => t.stop());
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: currentFacingMode }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+    });
+    const video = document.getElementById('cam-video');
+    video.srcObject = stream;
+    applyVideoMirror();
+    await video.play();
+  } catch(e) {
+    currentFacingMode = previousMode;
+    const status = document.getElementById('cam-status');
+    if (status) status.textContent = '⚠️ Kunne ikke bytte kamera: ' + e.message;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: currentFacingMode }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+      });
+      const video = document.getElementById('cam-video');
+      video.srcObject = stream;
+      applyVideoMirror();
+      await video.play();
+    } catch(e2) { stopCamera(); }
+  }
 }
  
 // ── CMF Lookup from database – legger til et kort i listen for hver ──
@@ -487,6 +545,8 @@ function addCMFResult(rawCode) {
   if (!match && CMF_DB[rawCode.trim()]) {
     match = CMF_DB[rawCode.trim()];
   }
+ 
+  showCamFoundToast(match, nums[0] || rawCode.substring(0, 20));
  
   const card = document.createElement('div');
   if (match) {
@@ -529,6 +589,30 @@ function addCMFResult(rawCode) {
       </div>`;
   }
   list.prepend(card);
+}
+ 
+// Viser siste funn øverst i selve kamerabildet med én gang, slik at man
+// ikke trenger å scrolle ned til listen for å se hvilken figur det var.
+function showCamFoundToast(match, shortCode) {
+  const toast = document.getElementById('cam-found-toast');
+  const img = document.getElementById('cam-found-img');
+  const nameEl = document.getElementById('cam-found-name');
+  const seriesEl = document.getElementById('cam-found-series');
+  if (!toast) return;
+ 
+  if (match) {
+    const blNum = match.num;
+    img.style.display = 'block';
+    img.src = `https://rebrickable.com/media/minifigs/${blNum}.jpg`;
+    img.onerror = () => { img.onerror = null; img.src = `https://img.bricklink.com/ItemImage/MN/0/${blNum}.png`; };
+    nameEl.textContent = '✅ ' + match.name;
+    seriesEl.textContent = match.series;
+  } else {
+    img.style.display = 'none';
+    nameEl.textContent = '🤔 Ukjent kode';
+    seriesEl.textContent = shortCode || '';
+  }
+  toast.style.display = 'flex';
 }
  
 // ── Brick scan (Brickognize, via Netlify-funksjon for å unngå CORS) ─
