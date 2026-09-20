@@ -431,7 +431,9 @@ function cameraDebugSuffix() {
     let focus = '';
     try {
       const caps = track.getCapabilities ? track.getCapabilities() : {};
+      const cur = track.getSettings ? track.getSettings() : {};
       focus = caps.focusMode ? ` foc:${caps.focusMode.join('/')}` : ' foc:?';
+      if (caps.focusDistance) focus += ` dist:${cur.focusDistance ?? '?'}(${caps.focusDistance.min}-${caps.focusDistance.max})`;
     } catch(e) {}
     return `${fm}, ${dims}${focus}`;
   } catch(e) { return ''; }
@@ -691,6 +693,12 @@ async function openCameraStream(facingMode) {
         const caps = track.getCapabilities ? track.getCapabilities() : {};
         if (caps.focusMode && caps.focusMode.includes('continuous')) {
           await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+        } else if (caps.focusMode && caps.focusMode.includes('manual') && caps.focusDistance) {
+          // Ingen autofokus tilgjengelig i det hele tatt (kun manuelt fokus).
+          // Prøv å tvinge fokusmotoren til nærmeste tilgjengelige avstand,
+          // siden en QR-kode holdt nært kameraet ellers blir uskarp på
+          // telefoner som ikke har autofokus på frontkameraet.
+          await track.applyConstraints({ advanced: [{ focusMode: 'manual', focusDistance: caps.focusDistance.min }] });
         }
       } catch (e) { /* ikke støttet - helt greit, bare fortsett */ }
       return s;
