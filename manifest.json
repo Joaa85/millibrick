@@ -1,6 +1,6 @@
 {
-  "name": "MilliBrick",
-  "short_name": "MilliBrick",
+  "name": "LegAaland",
+  "short_name": "LegAaland",
   "description": "Din familie-LEGO-assistent",
   "start_url": "/",
   "scope": "/",
@@ -14,13 +14,13 @@
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
