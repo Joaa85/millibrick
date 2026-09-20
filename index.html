@@ -751,13 +751,15 @@ function setupFocusSlider(track) {
       slider.value = (settings.focusDistance !== undefined && settings.focusDistance !== null)
         ? settings.focusDistance
         : ((caps.focusDistance.min + caps.focusDistance.max) / 2);
-      // Dette kameraet mangler ekte autofokus. På enkelte telefoner er
-      // objektivet i praksis fastfokus (ingen fokusmotor i det hele tatt),
-      // og da vil verken bryteren eller avstand til motivet gjøre noen
-      // forskjell - da er bakkameraet (som normalt har ekte autofokus)
-      // eneste løsning. Vi viser derfor alltid dette hintet sammen med
-      // bryteren, i stedet for å late som om bryteren garantert virker.
-      if (hint) hint.textContent = 'Fokuserer ikke? Trykk 🔄 og bruk bakkameraet i stedet';
+      // Dette kameraet mangler ekte autofokus (kun "manual" i focusMode).
+      // NB: front-kamera-skanning er et krav i seg selv (esker på pegg
+      // skannes ved å skyve telefonen under uten å ta dem ned), så et
+      // "bruk bakkameraet i stedet"-hint er IKKE en akseptabel løsning her
+      // - frontkameraet må faktisk fungere. Testing har vist at verken
+      // denne bryteren eller fysisk avstand til QR-koden gjør bildet
+      // skarpere på enkelte telefoner, som tyder på at årsaken kanskje
+      // ikke er feil fokusavstand i det hele tatt (se videre feilsøking).
+      if (hint) hint.textContent = 'Dra for å justere fokus manuelt';
       wrap.style.display = 'flex';
     } else {
       wrap.style.display = 'none';
