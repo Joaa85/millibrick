@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>MilliBrick</title>
+<title>LegAaland</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icons/icon-192.png">
@@ -12,15 +12,14 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="MilliBrick">
+<meta name="apple-mobile-web-app-title" content="LegAaland">
 <style>
 :root{--red:#E3000B;--yellow:#FFD700;--blue:#006CB7;--dark:#1a1a2e;--card:#fff;--bg:#f0f4ff;--text:#1a1a2e;--muted:#6b7280;--radius:16px;--shadow:0 4px 24px rgba(0,0,0,.10);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;max-width:480px;margin:0 auto;overflow-x:hidden;}
 .header{background:var(--dark);padding:16px 20px 12px;position:sticky;top:0;z-index:100;}
-.logo{font-size:24px;font-weight:900;color:var(--yellow);display:flex;align-items:center;gap:8px;}
-.logo span{color:var(--red);}
-.logo-icon{width:32px;height:32px;border-radius:8px;object-fit:cover;}
+.logo{display:flex;align-items:center;}
+.logo-wordmark{height:38px;width:auto;display:block;}
 .tabs{display:flex;background:var(--dark);padding:0 12px 12px;gap:8px;}
 .tab{flex:1;padding:10px 4px;border-radius:12px;border:none;background:rgba(255,255,255,.08);color:rgba(255,255,255,.5);font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:3px;}
 .tab .ti{font-size:18px;}
@@ -112,11 +111,11 @@ a{color:var(--blue);}
 <body>
  
 <div class="header">
-  <div class="logo">Milli<span>Brick</span> <img src="/icons/icon-192.png" alt="MilliBrick" class="logo-icon"></div>
+  <div class="logo"><img src="/icons/legaaland-wordmark.png" alt="LegAaland" class="logo-wordmark"></div>
 </div>
  
 <div class="tabs">
-  <button class="tab active" onclick="switchTab('cmf')"><img class="ti-img" src="/icons/tab-box.png" alt="">Minifig box scanner</button>
+  <button class="tab active" onclick="switchTab('cmf')"><img class="ti-img" src="/icons/tab-box-minifig.png" alt="">Minifig box scanner</button>
   <button class="tab" onclick="switchTab('scan')"><img class="ti-img" src="/icons/tab-minifig.png" alt="">Skann din minifigur</button>
   <button class="tab" onclick="switchTab('build')"><img class="ti-img" src="/icons/tab-bricks.png" alt="">Byggeideer</button>
 </div>
@@ -125,13 +124,13 @@ a{color:var(--blue);}
  
   <!-- TAB 1: CMF -->
   <div class="tab-content active" id="tab-cmf">
-    <div class="section-title"><img class="title-icon" src="/icons/tab-box.png" alt=""> Minifig box scanner</div>
+    <div class="section-title"><img class="title-icon" src="/icons/tab-box-minifig.png" alt=""> Minifig box scanner</div>
     <div class="tip-box">
       📦 Vis QR koden til kameraet
     </div>
     <div class="cam-wrap" id="cam-wrap">
       <div class="cam-placeholder" id="cam-placeholder">
-        <img class="big-icon" src="/icons/tab-box.png" alt="">
+        <img class="big-icon" src="/icons/tab-box-minifig.png" alt="">
         <p id="cam-placeholder-text">Starter kamera...</p>
       </div>
       <video id="cam-video" style="display:none;width:100%;height:100%;object-fit:cover;" autoplay muted playsinline></video>
