@@ -17,15 +17,15 @@
 :root{--red:#E3000B;--yellow:#FFD700;--blue:#006CB7;--dark:#1a1a2e;--card:#fff;--bg:#f0f4ff;--text:#1a1a2e;--muted:#6b7280;--radius:16px;--shadow:0 4px 24px rgba(0,0,0,.10);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;max-width:480px;margin:0 auto;overflow-x:hidden;}
-.header{background:var(--red);padding:16px 20px 12px;position:sticky;top:0;z-index:100;}
+.header{background:var(--red);padding:14px 20px 10px 10px;position:sticky;top:0;z-index:100;}
 .logo{display:flex;align-items:center;}
-.logo-wordmark{height:76px;width:auto;display:block;}
-.tabs{display:flex;background:var(--red);padding:0 12px 12px;gap:8px;}
-.tab{flex:1;padding:6px 2px;border-radius:12px;border:none;background:var(--dark);color:rgba(255,255,255,.5);font-family:'Nunito',sans-serif;font-weight:800;font-size:10px;white-space:nowrap;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.logo-wordmark{height:58px;width:auto;display:block;}
+.tabs{display:flex;background:var(--red);padding:2px 12px 12px;gap:8px;}
+.tab{flex:1;padding:6px 2px;border-radius:12px;border:3px solid var(--dark);background:#fff;color:rgba(26,26,46,.55);font-family:'Nunito',sans-serif;font-weight:800;font-size:10px;white-space:nowrap;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:2px;}
 .tab .ti{font-size:18px;}
 .ti-img{width:30px;height:30px;object-fit:contain;}
 .title-icon{width:24px;height:24px;object-fit:contain;vertical-align:-5px;}
-.tab.active{background:var(--yellow);color:var(--dark);}
+.tab.active{background:#fff;color:var(--dark);outline:3px solid var(--yellow);outline-offset:2px;}
 .main{padding:20px 16px 100px;}
 .tab-content{display:none;}
 .tab-content.active{display:block;}
@@ -49,9 +49,11 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .cam-debug{position:absolute;top:8px;left:8px;font-size:9px;color:rgba(255,255,255,.55);font-family:'Space Mono',monospace;background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;pointer-events:none;}
 .cam-flip-btn{position:absolute;top:10px;right:10px;z-index:6;width:38px;height:38px;border-radius:50%;border:none;background:rgba(13,13,26,.6);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px);}
 .cam-flip-btn:active{transform:scale(.92);}
-.cam-focus-wrap{position:absolute;left:10px;right:10px;bottom:8px;z-index:6;display:none;align-items:center;gap:8px;background:rgba(13,13,26,.6);backdrop-filter:blur(3px);border-radius:20px;padding:6px 12px;}
-.cam-focus-wrap span{font-size:14px;flex:none;}
-.cam-focus-wrap input[type=range]{flex:1;accent-color:var(--yellow);height:20px;}
+.cam-focus-wrap{position:absolute;left:10px;right:10px;bottom:8px;z-index:6;display:none;flex-direction:column;gap:4px;background:rgba(13,13,26,.65);backdrop-filter:blur(3px);border-radius:14px;padding:6px 12px 8px;}
+.cam-focus-hint{font-size:10px;color:rgba(255,255,255,.85);font-family:'Space Mono',monospace;text-align:center;}
+.cam-focus-row{display:flex;align-items:center;gap:8px;}
+.cam-focus-row span{font-size:14px;flex:none;}
+.cam-focus-row input[type=range]{flex:1;accent-color:var(--yellow);height:20px;}
 .cam-live-list{position:absolute;top:0;left:0;right:44px;z-index:5;display:flex;flex-direction:column;gap:6px;padding:8px;pointer-events:none;max-height:100%;overflow:hidden;}
 .cam-live-item{display:flex;align-items:center;gap:12px;background:rgba(13,13,26,.88);backdrop-filter:blur(3px);border-radius:12px;padding:8px 12px;animation:up .2s ease;}
 .cam-live-item img{width:64px;height:64px;object-fit:contain;border-radius:10px;background:#fff;flex-shrink:0;}
@@ -145,8 +147,11 @@ a{color:var(--blue);}
       <div class="cam-status" id="cam-status" style="display:none;"></div>
       <div class="cam-debug" id="cam-debug" style="display:none;"></div>
       <div class="cam-focus-wrap" id="cam-focus-wrap">
-        <span>🔍</span>
-        <input type="range" id="focus-slider" oninput="onFocusSliderInput(event)">
+        <div class="cam-focus-hint" id="cam-focus-hint"></div>
+        <div class="cam-focus-row">
+          <span>🔍</span>
+          <input type="range" id="focus-slider" oninput="onFocusSliderInput(event)">
+        </div>
       </div>
     </div>
     <div class="row">
@@ -730,6 +735,7 @@ let focusTrack = null;
 function setupFocusSlider(track) {
   const wrap = document.getElementById('cam-focus-wrap');
   const slider = document.getElementById('focus-slider');
+  const hint = document.getElementById('cam-focus-hint');
   focusTrack = null;
   if (!wrap || !slider) return;
   try {
@@ -745,6 +751,13 @@ function setupFocusSlider(track) {
       slider.value = (settings.focusDistance !== undefined && settings.focusDistance !== null)
         ? settings.focusDistance
         : ((caps.focusDistance.min + caps.focusDistance.max) / 2);
+      // Dette kameraet mangler ekte autofokus. På enkelte telefoner er
+      // objektivet i praksis fastfokus (ingen fokusmotor i det hele tatt),
+      // og da vil verken bryteren eller avstand til motivet gjøre noen
+      // forskjell - da er bakkameraet (som normalt har ekte autofokus)
+      // eneste løsning. Vi viser derfor alltid dette hintet sammen med
+      // bryteren, i stedet for å late som om bryteren garantert virker.
+      if (hint) hint.textContent = 'Fokuserer ikke? Trykk 🔄 og bruk bakkameraet i stedet';
       wrap.style.display = 'flex';
     } else {
       wrap.style.display = 'none';
