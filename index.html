@@ -428,7 +428,12 @@ function cameraDebugSuffix() {
     const s = track.getSettings ? track.getSettings() : {};
     const fm = s.facingMode || track.label || '?';
     const dims = (s.width && s.height) ? `${s.width}×${s.height}` : '?';
-    return `${fm}, ${dims}`;
+    let focus = '';
+    try {
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+      focus = caps.focusMode ? ` foc:${caps.focusMode.join('/')}` : ' foc:?';
+    } catch(e) {}
+    return `${fm}, ${dims}${focus}`;
   } catch(e) { return ''; }
 }
  
@@ -666,14 +671,30 @@ function toggleCMFCamera() {
 // (spesielt front-)kameraer på Android feiler på faste bredde/høyde-krav.
 async function openCameraStream(facingMode) {
   const attempts = [
-    { video: { facingMode: { exact: facingMode }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+    { video: { facingMode: { exact: facingMode }, width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] } },
     { video: { facingMode: { ideal: facingMode } } },
     { video: { facingMode } },
     { video: true },
   ];
   let lastErr;
   for (const constraints of attempts) {
-    try { return await navigator.mediaDevices.getUserMedia(constraints); }
+    try {
+      const s = await navigator.mediaDevices.getUserMedia(constraints);
+      // Belt-and-suspenders: noen nettlesere/telefoner respekterer bare
+      // "advanced"-ønsker satt via applyConstraints() ETTER at strømmen er
+      // hentet, ikke i selve getUserMedia-kallet. Frontkameraer på enkelte
+      // telefoner faller tilbake til fast fokus (satt for selfie-avstand)
+      // med mindre kontinuerlig autofokus eksplisitt bes om her - noe som
+      // gjør at de ikke klarer å fokusere på en QR-kode holdt nært kameraet.
+      try {
+        const track = s.getVideoTracks()[0];
+        const caps = track.getCapabilities ? track.getCapabilities() : {};
+        if (caps.focusMode && caps.focusMode.includes('continuous')) {
+          await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+        }
+      } catch (e) { /* ikke støttet - helt greit, bare fortsett */ }
+      return s;
+    }
     catch (e) { lastErr = e; }
   }
   throw lastErr;
