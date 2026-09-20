@@ -21,7 +21,6 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .logo{font-size:24px;font-weight:900;color:var(--yellow);display:flex;align-items:center;gap:8px;}
 .logo span{color:var(--red);}
 .logo-icon{width:32px;height:32px;border-radius:8px;object-fit:cover;}
-.logo-sub{font-size:11px;color:rgba(255,255,255,.4);font-family:'Space Mono',monospace;margin-top:2px;}
 .tabs{display:flex;background:var(--dark);padding:0 12px 12px;gap:8px;}
 .tab{flex:1;padding:10px 4px;border-radius:12px;border:none;background:rgba(255,255,255,.08);color:rgba(255,255,255,.5);font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:3px;}
 .tab .ti{font-size:18px;}
@@ -48,6 +47,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .scan-pulse{position:absolute;inset:-4px;border-radius:12px;border:2px solid var(--yellow);opacity:0;animation:pulse 2s ease-in-out infinite;}
 @keyframes pulse{0%,100%{opacity:0}50%{opacity:.5}}
 .cam-status{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;font-weight:800;color:#fff;font-family:'Space Mono',monospace;text-shadow:0 1px 4px rgba(0,0,0,.9);padding:0 12px;}
+.cam-debug{position:absolute;top:8px;left:8px;font-size:9px;color:rgba(255,255,255,.55);font-family:'Space Mono',monospace;background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;pointer-events:none;}
 .cam-flip-btn{position:absolute;top:10px;right:10px;z-index:6;width:38px;height:38px;border-radius:50%;border:none;background:rgba(13,13,26,.6);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px);}
 .cam-flip-btn:active{transform:scale(.92);}
 .cam-live-list{position:absolute;top:0;left:0;right:44px;z-index:5;display:flex;flex-direction:column;gap:6px;padding:8px;pointer-events:none;max-height:100%;overflow:hidden;}
@@ -113,7 +113,6 @@ a{color:var(--blue);}
  
 <div class="header">
   <div class="logo">Milli<span>Brick</span> <img src="/icons/icon-192.png" alt="MilliBrick" class="logo-icon"></div>
-  <div class="logo-sub">Din familie-LEGO-assistent</div>
 </div>
  
 <div class="tabs">
@@ -142,6 +141,7 @@ a{color:var(--blue);}
         <div class="cam-frame"><div class="scan-pulse"></div></div>
       </div>
       <div class="cam-status" id="cam-status" style="display:none;"></div>
+      <div class="cam-debug" id="cam-debug" style="display:none;"></div>
     </div>
     <div class="row">
       <button class="btn btn-red" id="btn-toggle-cam" onclick="toggleCMFCamera()">📷 Start kamera</button>
@@ -340,6 +340,58 @@ const CMF_DB = {
   '6605253':{ name:'Mysterious Ronin',     series:'Series 29 (71052)', num:'col29-11' },
   '6603326':{ name:'Unicorn Elf',          series:'Series 29 (71052)', num:'col29-12' },
   '6605252':{ name:'Unicorn Elf',          series:'Series 29 (71052)', num:'col29-12' },
+ 
+  // ── F1 Race Cars (71049) ────────────────────────────────
+  '6538426':{ name:'RB20 (Red Bull Racing)', series:'F1 Race Cars (71049)', num:'f1-1',  img:'f1/1'  },
+  '6536842':{ name:'RB20 (Red Bull Racing)', series:'F1 Race Cars (71049)', num:'f1-1',  img:'f1/1'  },
+  '6538427':{ name:'Mercedes-AMG',           series:'F1 Race Cars (71049)', num:'f1-2',  img:'f1/2'  },
+  '6536843':{ name:'Mercedes-AMG',           series:'F1 Race Cars (71049)', num:'f1-2',  img:'f1/2'  },
+  '6538425':{ name:'Ferrari',                series:'F1 Race Cars (71049)', num:'f1-3',  img:'f1/3'  },
+  '6536841':{ name:'Ferrari',                series:'F1 Race Cars (71049)', num:'f1-3',  img:'f1/3'  },
+  '6538434':{ name:'McLaren',                series:'F1 Race Cars (71049)', num:'f1-4',  img:'f1/4'  },
+  '6536850':{ name:'McLaren',                series:'F1 Race Cars (71049)', num:'f1-4',  img:'f1/4'  },
+  '6538428':{ name:'Aston Martin',           series:'F1 Race Cars (71049)', num:'f1-5',  img:'f1/5'  },
+  '6536844':{ name:'Aston Martin',           series:'F1 Race Cars (71049)', num:'f1-5',  img:'f1/5'  },
+  '6538431':{ name:'Alpine',                 series:'F1 Race Cars (71049)', num:'f1-6',  img:'f1/6'  },
+  '6536847':{ name:'Alpine',                 series:'F1 Race Cars (71049)', num:'f1-6',  img:'f1/6'  },
+  '6538432':{ name:'Williams',               series:'F1 Race Cars (71049)', num:'f1-7',  img:'f1/7'  },
+  '6536848':{ name:'Williams',               series:'F1 Race Cars (71049)', num:'f1-7',  img:'f1/7'  },
+  '6538429':{ name:'VCARB',                  series:'F1 Race Cars (71049)', num:'f1-8',  img:'f1/8'  },
+  '6536845':{ name:'VCARB',                  series:'F1 Race Cars (71049)', num:'f1-8',  img:'f1/8'  },
+  '6538430':{ name:'Sauber',                 series:'F1 Race Cars (71049)', num:'f1-9',  img:'f1/9'  },
+  '6536846':{ name:'Sauber',                 series:'F1 Race Cars (71049)', num:'f1-9',  img:'f1/9'  },
+  '6538433':{ name:'Haas',                   series:'F1 Race Cars (71049)', num:'f1-10', img:'f1/10' },
+  '6536849':{ name:'Haas',                   series:'F1 Race Cars (71049)', num:'f1-10', img:'f1/10' },
+  '6538436':{ name:'F1 Academy',             series:'F1 Race Cars (71049)', num:'f1-11', img:'f1/11' },
+  '6536852':{ name:'F1 Academy',             series:'F1 Race Cars (71049)', num:'f1-11', img:'f1/11' },
+  '6538435':{ name:'F1 (generisk)',          series:'F1 Race Cars (71049)', num:'f1-12', img:'f1/12' },
+  '6536851':{ name:'F1 (generisk)',          series:'F1 Race Cars (71049)', num:'f1-12', img:'f1/12' },
+ 
+  // ── Spider-Man: Across the Spider-Verse (71050) ─────────
+  '6615990':{ name:'Miles Morales / Spider-Man',        series:'Spider-Verse (71050)', num:'spiderverse-1',  img:'spiderman-spiderverse/1'  },
+  '6568959':{ name:'Miles Morales / Spider-Man',        series:'Spider-Verse (71050)', num:'spiderverse-1',  img:'spiderman-spiderverse/1'  },
+  '6615995':{ name:'Hobie Brown / Spider-Punk',         series:'Spider-Verse (71050)', num:'spiderverse-2',  img:'spiderman-spiderverse/2'  },
+  '6568964':{ name:'Hobie Brown / Spider-Punk',         series:'Spider-Verse (71050)', num:'spiderverse-2',  img:'spiderman-spiderverse/2'  },
+  '6615994':{ name:'Miles G. Morales / Prowler',        series:'Spider-Verse (71050)', num:'spiderverse-3',  img:'spiderman-spiderverse/3'  },
+  '6568963':{ name:'Miles G. Morales / Prowler',        series:'Spider-Verse (71050)', num:'spiderverse-3',  img:'spiderman-spiderverse/3'  },
+  '6615993':{ name:'Gwen Stacy / Spider-Gwen',          series:'Spider-Verse (71050)', num:'spiderverse-4',  img:'spiderman-spiderverse/4'  },
+  '6568962':{ name:'Gwen Stacy / Spider-Gwen',          series:'Spider-Verse (71050)', num:'spiderverse-4',  img:'spiderman-spiderverse/4'  },
+  '6615991':{ name:'Miguel O\'Hara / Spider-Man 2099',  series:'Spider-Verse (71050)', num:'spiderverse-5',  img:'spiderman-spiderverse/5'  },
+  '6568960':{ name:'Miguel O\'Hara / Spider-Man 2099',  series:'Spider-Verse (71050)', num:'spiderverse-5',  img:'spiderman-spiderverse/5'  },
+  '6615996':{ name:'Pavitr Prabhakar / Spider-Man India', series:'Spider-Verse (71050)', num:'spiderverse-6',  img:'spiderman-spiderverse/6'  },
+  '6568965':{ name:'Pavitr Prabhakar / Spider-Man India', series:'Spider-Verse (71050)', num:'spiderverse-6',  img:'spiderman-spiderverse/6'  },
+  '6615999':{ name:'Petra Parker / Cyborg Spider-Woman', series:'Spider-Verse (71050)', num:'spiderverse-7',  img:'spiderman-spiderverse/7'  },
+  '6568968':{ name:'Petra Parker / Cyborg Spider-Woman', series:'Spider-Verse (71050)', num:'spiderverse-7',  img:'spiderman-spiderverse/7'  },
+  '6615992':{ name:'Charlotte Webber / Sun-Spider',     series:'Spider-Verse (71050)', num:'spiderverse-8',  img:'spiderman-spiderverse/8'  },
+  '6568961':{ name:'Charlotte Webber / Sun-Spider',     series:'Spider-Verse (71050)', num:'spiderverse-8',  img:'spiderman-spiderverse/8'  },
+  '6615998':{ name:'Margo Kess / Spider-Byte',          series:'Spider-Verse (71050)', num:'spiderverse-9',  img:'spiderman-spiderverse/9'  },
+  '6568967':{ name:'Margo Kess / Spider-Byte',          series:'Spider-Verse (71050)', num:'spiderverse-9',  img:'spiderman-spiderverse/9'  },
+  '6615997':{ name:'Peter B. Parker & May "Mayday" Parker', series:'Spider-Verse (71050)', num:'spiderverse-10', img:'spiderman-spiderverse/10' },
+  '6568966':{ name:'Peter B. Parker & May "Mayday" Parker', series:'Spider-Verse (71050)', num:'spiderverse-10', img:'spiderman-spiderverse/10' },
+  '6616000':{ name:'Patrick O\'Hara / Web-Slinger',     series:'Spider-Verse (71050)', num:'spiderverse-11', img:'spiderman-spiderverse/11' },
+  '6568969':{ name:'Patrick O\'Hara / Web-Slinger',     series:'Spider-Verse (71050)', num:'spiderverse-11', img:'spiderman-spiderverse/11' },
+  '6616001':{ name:'Peter Parker / Werewolf Spider-Man', series:'Spider-Verse (71050)', num:'spiderverse-12', img:'spiderman-spiderverse/12' },
+  '6568970':{ name:'Peter Parker / Werewolf Spider-Man', series:'Spider-Verse (71050)', num:'spiderverse-12', img:'spiderman-spiderverse/12' },
 };
  
 // ── Tab switching ──────────────────────────────────────────
@@ -367,6 +419,30 @@ function applyVideoMirror() {
   video.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'none';
 }
  
+// Leser hva nettleseren FAKTISK ga oss (ikke bare hva vi ba om) - noen
+// telefoner/nettlesere gir stille et annet kamera enn det som ble
+// forespurt. Vises i status-teksten som en enkel feilsøkingshjelp.
+function cameraDebugSuffix() {
+  try {
+    const track = stream && stream.getVideoTracks()[0];
+    if (!track) return '';
+    const s = track.getSettings ? track.getSettings() : {};
+    const fm = s.facingMode || track.label || '?';
+    const dims = (s.width && s.height) ? `${s.width}×${s.height}` : '?';
+    return `${fm}, ${dims}`;
+  } catch(e) { return ''; }
+}
+ 
+// Oppdaterer det lille diskré feilsøkings-merket i hjørnet av kamerabildet
+// (i stedet for å blande det inn i hovedstatusteksten).
+function updateCamDebug() {
+  const badge = document.getElementById('cam-debug');
+  if (!badge) return;
+  const txt = cameraDebugSuffix();
+  if (txt) { badge.textContent = txt; badge.style.display = 'block'; }
+  else { badge.style.display = 'none'; }
+}
+ 
 async function startCMFCamera() {
   const placeholderText = document.getElementById('cam-placeholder-text');
   if (placeholderText) placeholderText.textContent = 'Starter kamera...';
@@ -387,8 +463,9 @@ async function startCMFCamera() {
     document.getElementById('cam-overlay').style.display = 'flex';
     document.getElementById('btn-flip-cam').style.display = 'flex';
     const status = document.getElementById('cam-status');
-    status.style.display = 'block';
-    status.textContent = '🔍 Hold QR-koden(e) mot kameraet...';
+    status.style.display = 'none';
+    status.textContent = '';
+    updateCamDebug();
     const toggleBtn = document.getElementById('btn-toggle-cam');
     if (toggleBtn) { toggleBtn.textContent = '⏹ Stopp kamera'; toggleBtn.className = 'btn btn-stop'; }
  
@@ -398,6 +475,7 @@ async function startCMFCamera() {
       try { det = new BarcodeDetector({ formats: ['qr_code','data_matrix','aztec','pdf417'] }); }
       catch(e) { det = new BarcodeDetector(); }
     } else if (typeof jsQR === 'undefined') {
+      status.style.display = 'block';
       status.textContent = '⚠️ Automatisk skanning støttes ikke i denne nettleseren.';
       return;
     }
@@ -412,7 +490,12 @@ async function startCMFCamera() {
     scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
  
     scanInterval = setInterval(async () => {
-      if (!video.videoWidth) return;
+      updateCamDebug();
+      if (!video.videoWidth) {
+        status.style.display = 'block';
+        status.textContent = '⏳ Venter på kamerabilde...';
+        return;
+      }
       try {
         scanCanvas.width = video.videoWidth;
         scanCanvas.height = video.videoHeight;
@@ -428,9 +511,13 @@ async function startCMFCamera() {
         }
         rawCodes.forEach(raw => handleDetectedCode(raw));
         purgeAndRenderLive();
-        status.textContent = rawCodes.length
-          ? '✅ Kode lest! Fortsetter å skanne...'
-          : '🔍 Hold QR-koden(e) mot kameraet...';
+        if (rawCodes.length) {
+          status.style.display = 'block';
+          status.textContent = '✅ Kode lest! Fortsetter å skanne...';
+        } else {
+          status.style.display = 'none';
+          status.textContent = '';
+        }
       } catch(e) {}
     }, 350);
   } catch(e) {
@@ -531,10 +618,14 @@ function renderLiveMatches() {
   }).join('');
 }
  
-// Bygger en bilde-URL fra LEGOs egen samlernummerering (f.eks. "col25-1" →
-// serie 25, figur 1; "coldnd-3" → D&D, figur 3), basert på det statiske
-// bildearkivet til minifigurescanner.com.
+// Bygger en bilde-URL basert på det statiske bildearkivet til
+// minifigurescanner.com. De fleste figurene bruker LEGOs egen
+// samlernummerering (f.eks. "col25-1" → serie 25, figur 1), men noen
+// lisensierte serier (F1, Spider-Verse osv.) har ikke et slikt "col"-
+// nummer i det hele tatt - de har i stedet et eksplisitt "img"-felt
+// (f.eks. "f1/3") satt direkte på CMF_DB-oppføringen.
 function cmfImageUrl(match) {
+  if (match.img) return `https://minifigurescanner.com/cmf/${match.img}.webp`;
   const m = (match.num || '').match(/^col(\w+?)-(\d+)$/);
   if (!m) return null;
   const seriesKey = m[1];
@@ -555,6 +646,8 @@ function resetCamUI() {
   document.getElementById('cam-overlay').style.display = 'none';
   document.getElementById('cam-status').style.display = 'none';
   document.getElementById('btn-flip-cam').style.display = 'none';
+  const debugBadge = document.getElementById('cam-debug');
+  if (debugBadge) debugBadge.style.display = 'none';
   liveMatches = new Map();
   lastRenderedKeys = '';
   const liveList = document.getElementById('cam-live-list');
@@ -607,16 +700,18 @@ async function flipCamera() {
     video.srcObject = stream;
     applyVideoMirror();
     await video.play();
-    if (status) status.textContent = '🔍 Hold QR-koden(e) mot kameraet...';
+    if (status) { status.style.display = 'none'; status.textContent = ''; }
+    updateCamDebug();
   } catch(e) {
-    if (status) status.textContent = `⚠️ Fikk ikke tilgang til ${nextMode === 'user' ? 'frontkamera' : 'bakkamera'}. Bytter tilbake...`;
+    if (status) { status.style.display = 'block'; status.textContent = `⚠️ Fikk ikke tilgang til ${nextMode === 'user' ? 'frontkamera' : 'bakkamera'}. Bytter tilbake...`; }
     try {
       stream = await openCameraStream(previousMode);
       currentFacingMode = previousMode;
       video.srcObject = stream;
       applyVideoMirror();
       await video.play();
-      if (status) status.textContent = '🔍 Hold QR-koden(e) mot kameraet...';
+      if (status) { status.style.display = 'none'; status.textContent = ''; }
+      updateCamDebug();
     } catch(e2) {
       stopCamera();
     }
