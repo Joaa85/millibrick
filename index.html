@@ -49,6 +49,9 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .cam-debug{position:absolute;top:8px;left:8px;font-size:9px;color:rgba(255,255,255,.55);font-family:'Space Mono',monospace;background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;pointer-events:none;}
 .cam-flip-btn{position:absolute;top:10px;right:10px;z-index:6;width:38px;height:38px;border-radius:50%;border:none;background:rgba(13,13,26,.6);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px);}
 .cam-flip-btn:active{transform:scale(.92);}
+.cam-focus-wrap{position:absolute;left:10px;right:10px;bottom:8px;z-index:6;display:none;align-items:center;gap:8px;background:rgba(13,13,26,.6);backdrop-filter:blur(3px);border-radius:20px;padding:6px 12px;}
+.cam-focus-wrap span{font-size:14px;flex:none;}
+.cam-focus-wrap input[type=range]{flex:1;accent-color:var(--yellow);height:20px;}
 .cam-live-list{position:absolute;top:0;left:0;right:44px;z-index:5;display:flex;flex-direction:column;gap:6px;padding:8px;pointer-events:none;max-height:100%;overflow:hidden;}
 .cam-live-item{display:flex;align-items:center;gap:12px;background:rgba(13,13,26,.88);backdrop-filter:blur(3px);border-radius:12px;padding:8px 12px;animation:up .2s ease;}
 .cam-live-item img{width:64px;height:64px;object-fit:contain;border-radius:10px;background:#fff;flex-shrink:0;}
@@ -141,6 +144,10 @@ a{color:var(--blue);}
       </div>
       <div class="cam-status" id="cam-status" style="display:none;"></div>
       <div class="cam-debug" id="cam-debug" style="display:none;"></div>
+      <div class="cam-focus-wrap" id="cam-focus-wrap">
+        <span>🔍</span>
+        <input type="range" id="focus-slider" oninput="onFocusSliderInput(event)">
+      </div>
     </div>
     <div class="row">
       <button class="btn btn-red" id="btn-toggle-cam" onclick="toggleCMFCamera()">📷 Start kamera</button>
@@ -472,6 +479,7 @@ async function startCMFCamera() {
     status.style.display = 'none';
     status.textContent = '';
     updateCamDebug();
+    setupFocusSlider(stream.getVideoTracks()[0]);
     const toggleBtn = document.getElementById('btn-toggle-cam');
     if (toggleBtn) { toggleBtn.textContent = '⏹ Stopp kamera'; toggleBtn.className = 'btn btn-stop'; }
  
@@ -654,6 +662,9 @@ function resetCamUI() {
   document.getElementById('btn-flip-cam').style.display = 'none';
   const debugBadge = document.getElementById('cam-debug');
   if (debugBadge) debugBadge.style.display = 'none';
+  const focusWrap = document.getElementById('cam-focus-wrap');
+  if (focusWrap) focusWrap.style.display = 'none';
+  focusTrack = null;
   liveMatches = new Map();
   lastRenderedKeys = '';
   const liveList = document.getElementById('cam-live-list');
@@ -693,19 +704,61 @@ async function openCameraStream(facingMode) {
         const caps = track.getCapabilities ? track.getCapabilities() : {};
         if (caps.focusMode && caps.focusMode.includes('continuous')) {
           await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-        } else if (caps.focusMode && caps.focusMode.includes('manual') && caps.focusDistance) {
-          // Ingen autofokus tilgjengelig i det hele tatt (kun manuelt fokus).
-          // Prøv å tvinge fokusmotoren til nærmeste tilgjengelige avstand,
-          // siden en QR-kode holdt nært kameraet ellers blir uskarp på
-          // telefoner som ikke har autofokus på frontkameraet.
-          await track.applyConstraints({ advanced: [{ focusMode: 'manual', focusDistance: caps.focusDistance.min }] });
         }
+        // NB: Vi setter IKKE en gjettet focusDistance-verdi her lenger.
+        // Web-API-et standardiserer ikke hvilken ende av focusDistance-
+        // skalaen som betyr "nær" vs. "langt unna" - det er forskjellig fra
+        // telefon til telefon, og å gjette (f.eks. alltid bruke min-verdien)
+        // viste seg å gjøre bildet MYE mer uskarpt på enkelte telefoner enn
+        // om vi lot kameraets egen standardinnstilling stå urørt. Kameraer
+        // med kun manuelt fokus (ingen autofokus i det hele tatt) får i
+        // stedet en glidebryter i grensesnittet, se setupFocusSlider().
       } catch (e) { /* ikke støttet - helt greit, bare fortsett */ }
       return s;
     }
     catch (e) { lastErr = e; }
   }
   throw lastErr;
+}
+ 
+// Kameraer uten noen form for autofokus (kun "manual" i focusMode-listen)
+// får en synlig glidebryter slik at brukeren selv kan finne riktig
+// fokusavstand ved å se på bildet live og justere til det blir skarpt.
+// Vi kan ikke vite på forhånd hvilken retning som er "nær" på akkurat
+// denne telefonen, så det er derfor en bryter og ikke et automatisk gjett.
+let focusTrack = null;
+function setupFocusSlider(track) {
+  const wrap = document.getElementById('cam-focus-wrap');
+  const slider = document.getElementById('focus-slider');
+  focusTrack = null;
+  if (!wrap || !slider) return;
+  try {
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    const hasContinuous = caps.focusMode && caps.focusMode.includes('continuous');
+    const hasManual = caps.focusMode && caps.focusMode.includes('manual') && caps.focusDistance;
+    if (hasManual && !hasContinuous) {
+      focusTrack = track;
+      slider.min = caps.focusDistance.min;
+      slider.max = caps.focusDistance.max;
+      slider.step = caps.focusDistance.step || ((caps.focusDistance.max - caps.focusDistance.min) / 100) || 0.01;
+      const settings = track.getSettings ? track.getSettings() : {};
+      slider.value = (settings.focusDistance !== undefined && settings.focusDistance !== null)
+        ? settings.focusDistance
+        : ((caps.focusDistance.min + caps.focusDistance.max) / 2);
+      wrap.style.display = 'flex';
+    } else {
+      wrap.style.display = 'none';
+    }
+  } catch (e) { wrap.style.display = 'none'; }
+}
+ 
+async function onFocusSliderInput(e) {
+  if (!focusTrack) return;
+  const val = parseFloat(e.target.value);
+  try {
+    await focusTrack.applyConstraints({ advanced: [{ focusMode: 'manual', focusDistance: val }] });
+  } catch (err) { /* noen nettlesere tillater ikke live-endring - ignorer */ }
+  updateCamDebug();
 }
  
 // Bytter mellom bak- og frontkamera uten å nullstille skanne-historikken
@@ -730,6 +783,7 @@ async function flipCamera() {
     await video.play();
     if (status) { status.style.display = 'none'; status.textContent = ''; }
     updateCamDebug();
+    setupFocusSlider(stream.getVideoTracks()[0]);
   } catch(e) {
     if (status) { status.style.display = 'block'; status.textContent = `⚠️ Fikk ikke tilgang til ${nextMode === 'user' ? 'frontkamera' : 'bakkamera'}. Bytter tilbake...`; }
     try {
@@ -740,6 +794,7 @@ async function flipCamera() {
       await video.play();
       if (status) { status.style.display = 'none'; status.textContent = ''; }
       updateCamDebug();
+      setupFocusSlider(stream.getVideoTracks()[0]);
     } catch(e2) {
       stopCamera();
     }
