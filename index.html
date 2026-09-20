@@ -17,13 +17,13 @@
 :root{--red:#E3000B;--yellow:#FFD700;--blue:#006CB7;--dark:#1a1a2e;--card:#fff;--bg:#f0f4ff;--text:#1a1a2e;--muted:#6b7280;--radius:16px;--shadow:0 4px 24px rgba(0,0,0,.10);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;max-width:480px;margin:0 auto;overflow-x:hidden;}
-.header{background:var(--dark);padding:16px 20px 12px;position:sticky;top:0;z-index:100;}
+.header{background:var(--red);padding:16px 20px 12px;position:sticky;top:0;z-index:100;}
 .logo{display:flex;align-items:center;}
-.logo-wordmark{height:38px;width:auto;display:block;}
+.logo-wordmark{height:56px;width:auto;display:block;}
 .tabs{display:flex;background:var(--dark);padding:0 12px 12px;gap:8px;}
 .tab{flex:1;padding:10px 4px;border-radius:12px;border:none;background:rgba(255,255,255,.08);color:rgba(255,255,255,.5);font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:3px;}
 .tab .ti{font-size:18px;}
-.ti-img{width:20px;height:20px;object-fit:contain;}
+.ti-img{width:30px;height:30px;object-fit:contain;}
 .title-icon{width:24px;height:24px;object-fit:contain;vertical-align:-5px;}
 .tab.active{background:var(--yellow);color:var(--dark);}
 .main{padding:20px 16px 100px;}
@@ -115,7 +115,7 @@ a{color:var(--blue);}
 </div>
  
 <div class="tabs">
-  <button class="tab active" onclick="switchTab('cmf')"><img class="ti-img" src="/icons/tab-box-minifig.png" alt="">Minifig box scanner</button>
+  <button class="tab active" onclick="switchTab('cmf')"><img class="ti-img" src="/icons/tab-box-minifig.png" alt="">Minifigur eske skanner</button>
   <button class="tab" onclick="switchTab('scan')"><img class="ti-img" src="/icons/tab-minifig.png" alt="">Skann din minifigur</button>
   <button class="tab" onclick="switchTab('build')"><img class="ti-img" src="/icons/tab-bricks.png" alt="">Byggeideer</button>
 </div>
@@ -124,7 +124,7 @@ a{color:var(--blue);}
  
   <!-- TAB 1: CMF -->
   <div class="tab-content active" id="tab-cmf">
-    <div class="section-title"><img class="title-icon" src="/icons/tab-box-minifig.png" alt=""> Minifig box scanner</div>
+    <div class="section-title"><img class="title-icon" src="/icons/tab-box-minifig.png" alt=""> Minifigur eske skanner</div>
     <div class="tip-box">
       📦 Vis QR koden til kameraet
     </div>
@@ -1043,7 +1043,7 @@ if ('serviceWorker' in navigator) {
   });
 }
  
-// ── Start kameraet automatisk hvis Minifig box scanner-fanen er åpen ──
+// ── Start kameraet automatisk hvis Minifigur eske skanner-fanen er åpen ──
 if (document.getElementById('tab-cmf').classList.contains('active')) {
   startCMFCamera();
 }
