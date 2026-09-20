@@ -1,4 +1,4 @@
-// MilliBrick – service worker for app-shell-caching (PWA-installasjon)
+// LegAaland – service worker for app-shell-caching (PWA-installasjon)
 //
 // v2: HTML-siden hentes alltid fra nettverket først (network-first), slik
 // at nye utrullinger vises med en gang i stedet for å bli sittende fast på
@@ -6,8 +6,13 @@
 // ikke dukket opp på telefoner som hadde installert appen). Ikoner og
 // manifest cache-først siden de sjelden endrer seg. Cache-navnet bumpes
 // ved hver funksjonell endring for å tvinge gamle cacher til å ryddes bort.
-const CACHE = 'millibrick-v2';
-const APP_SHELL = ['/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
+//
+// v3: bumpet fordi ikonene og manifest.json ble byttet ut (MilliBrick ->
+// LegAaland) - uten denne bumpen ville telefoner som allerede hadde besøkt
+// siden fortsette å vise de gamle, cachede ikonene på ubestemt tid siden de
+// caches "cache først".
+const CACHE = 'legaaland-v3';
+const APP_SHELL = ['/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/legaaland-wordmark.png'];
  
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(APP_SHELL)));
