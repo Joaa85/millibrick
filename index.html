@@ -61,14 +61,12 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 @keyframes pulse{0%,100%{opacity:0}50%{opacity:.5}}
 .cam-status{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;font-weight:800;color:#fff;font-family:'Space Mono',monospace;text-shadow:0 1px 4px rgba(0,0,0,.9);padding:0 12px;}
 .cam-debug{position:absolute;top:8px;left:8px;right:56px;font-size:9px;color:rgba(255,255,255,.55);font-family:'Space Mono',monospace;background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;pointer-events:none;}
-.still-debug-thumb{position:absolute;top:54px;right:8px;z-index:6;width:64px;height:64px;object-fit:cover;border:2px solid var(--yellow);border-radius:8px;pointer-events:none;}
+.still-debug-thumb{position:absolute;top:54px;right:8px;z-index:6;width:96px;height:96px;object-fit:cover;border:2px solid var(--yellow);border-radius:8px;cursor:pointer;}
+.still-lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:300;display:none;align-items:center;justify-content:center;overflow:auto;}
+.still-lightbox img{display:block;max-width:none;margin:auto;}
+.still-lightbox-hint{position:fixed;top:16px;left:0;right:0;text-align:center;color:#fff;font-size:12px;font-family:'Space Mono',monospace;z-index:301;pointer-events:none;}
 .cam-flip-btn{position:absolute;top:10px;right:10px;z-index:6;width:38px;height:38px;border-radius:50%;border:none;background:rgba(13,13,26,.6);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px);}
 .cam-flip-btn:active{transform:scale(.92);}
-.cam-focus-wrap{position:absolute;left:10px;right:10px;bottom:8px;z-index:6;display:none;flex-direction:column;gap:4px;background:rgba(13,13,26,.65);backdrop-filter:blur(3px);border-radius:14px;padding:6px 12px 8px;}
-.cam-focus-hint{font-size:10px;color:rgba(255,255,255,.85);font-family:'Space Mono',monospace;text-align:center;}
-.cam-focus-row{display:flex;align-items:center;gap:8px;}
-.cam-focus-row span{font-size:14px;flex:none;}
-.cam-focus-row input[type=range]{flex:1;accent-color:var(--yellow);height:20px;}
 .cam-live-list{position:absolute;top:0;left:0;right:44px;z-index:5;display:flex;flex-direction:column;gap:6px;padding:8px;pointer-events:none;max-height:100%;overflow:hidden;}
 .cam-live-item{display:flex;align-items:center;gap:12px;background:rgba(13,13,26,.88);backdrop-filter:blur(3px);border-radius:12px;padding:8px 12px;animation:up .2s ease;pointer-events:auto;}
 .cam-live-item img{width:64px;height:64px;object-fit:contain;border-radius:10px;background:#fff;flex-shrink:0;}
@@ -179,19 +177,17 @@ a{color:var(--blue);}
       </div>
       <div class="cam-status" id="cam-status" style="display:none;"></div>
       <div class="cam-debug" id="cam-debug" style="display:none;"></div>
-      <img class="still-debug-thumb" id="still-debug-thumb" style="display:none;" alt="Siste stillbilde (feilsøking)">
-      <div class="cam-focus-wrap" id="cam-focus-wrap">
-        <div class="cam-focus-hint" id="cam-focus-hint"></div>
-        <div class="cam-focus-row">
-          <span>🔍</span>
-          <input type="range" id="focus-slider" oninput="onFocusSliderInput(event)">
-        </div>
-      </div>
+      <img class="still-debug-thumb" id="still-debug-thumb" style="display:none;" alt="Siste stillbilde (feilsøking) - trykk for å se i full størrelse" onclick="openStillLightbox()">
     </div>
     <div class="row">
       <button class="btn btn-red" id="btn-toggle-cam" onclick="toggleCMFCamera()">📷 Start kamera</button>
     </div>
     <div id="cmf-results"></div>
+  </div>
+ 
+  <div class="still-lightbox" id="still-lightbox" onclick="closeStillLightbox()">
+    <div class="still-lightbox-hint">Trykk hvor som helst for å lukke · dra for å scrolle rundt i fullstørrelsesbildet</div>
+    <img id="still-lightbox-img" alt="Stillbilde i full størrelse">
   </div>
  
   <!-- TAB 2: SCAN BRICK -->
@@ -477,6 +473,7 @@ let stillCaptureTick = 0;
 let stillCaptureAttempts = 0;
 let stillCaptureErrors = 0;
 let stillCaptureLastError = '';
+let lastStillBlob = null; // siste stillbilde, i full oppløsning - brukes av lightboxen
  
 function applyVideoMirror() {
   const video = document.getElementById('cam-video');
@@ -538,7 +535,6 @@ async function startCMFCamera() {
     status.style.display = 'none';
     status.textContent = '';
     updateCamDebug();
-    setupFocusSlider(stream.getVideoTracks()[0]);
     setupImageCapture(stream.getVideoTracks()[0]);
     const toggleBtn = document.getElementById('btn-toggle-cam');
     if (toggleBtn) { toggleBtn.textContent = '⏹ Stopp kamera'; toggleBtn.className = 'btn btn-stop'; }
@@ -608,6 +604,7 @@ async function startCMFCamera() {
             // om selve fotoet er skarpere enn videobildet - i stedet for å bare
             // gjette basert på om en kode ble lest eller ikke.
             try {
+              lastStillBlob = blob;
               const thumb = document.getElementById('still-debug-thumb');
               if (thumb) {
                 const url = URL.createObjectURL(blob);
@@ -870,11 +867,10 @@ function resetCamUI() {
   document.getElementById('btn-flip-cam').style.display = 'none';
   const debugBadge = document.getElementById('cam-debug');
   if (debugBadge) debugBadge.style.display = 'none';
-  const focusWrap = document.getElementById('cam-focus-wrap');
-  if (focusWrap) focusWrap.style.display = 'none';
-  focusTrack = null;
   const stillThumb = document.getElementById('still-debug-thumb');
   if (stillThumb) stillThumb.style.display = 'none';
+  lastStillBlob = null;
+  closeStillLightbox();
   liveMatches = new Map();
   lastRenderedKeys = '';
   const liveList = document.getElementById('cam-live-list');
@@ -921,64 +917,16 @@ async function openCameraStream(facingMode) {
         // telefon til telefon, og å gjette (f.eks. alltid bruke min-verdien)
         // viste seg å gjøre bildet MYE mer uskarpt på enkelte telefoner enn
         // om vi lot kameraets egen standardinnstilling stå urørt. Kameraer
-        // med kun manuelt fokus (ingen autofokus i det hele tatt) får i
-        // stedet en glidebryter i grensesnittet, se setupFocusSlider().
+        // uten autofokus i det hele tatt får i stedet stillbilde-forsøket,
+        // se setupImageCapture() lenger ned - en synlig manuell fokus-
+        // glidebryter ble prøvd og deretter fjernet igjen, siden den ikke
+        // ga noen merkbar forskjell på denne enheten.
       } catch (e) { /* ikke støttet - helt greit, bare fortsett */ }
       return s;
     }
     catch (e) { lastErr = e; }
   }
   throw lastErr;
-}
- 
-// Kameraer uten noen form for autofokus (kun "manual" i focusMode-listen)
-// får en synlig glidebryter slik at brukeren selv kan finne riktig
-// fokusavstand ved å se på bildet live og justere til det blir skarpt.
-// Vi kan ikke vite på forhånd hvilken retning som er "nær" på akkurat
-// denne telefonen, så det er derfor en bryter og ikke et automatisk gjett.
-let focusTrack = null;
-function setupFocusSlider(track) {
-  const wrap = document.getElementById('cam-focus-wrap');
-  const slider = document.getElementById('focus-slider');
-  const hint = document.getElementById('cam-focus-hint');
-  focusTrack = null;
-  if (!wrap || !slider) return;
-  try {
-    const caps = track.getCapabilities ? track.getCapabilities() : {};
-    const hasContinuous = caps.focusMode && caps.focusMode.includes('continuous');
-    const hasManual = caps.focusMode && caps.focusMode.includes('manual') && caps.focusDistance;
-    if (hasManual && !hasContinuous) {
-      focusTrack = track;
-      slider.min = caps.focusDistance.min;
-      slider.max = caps.focusDistance.max;
-      slider.step = caps.focusDistance.step || ((caps.focusDistance.max - caps.focusDistance.min) / 100) || 0.01;
-      const settings = track.getSettings ? track.getSettings() : {};
-      slider.value = (settings.focusDistance !== undefined && settings.focusDistance !== null)
-        ? settings.focusDistance
-        : ((caps.focusDistance.min + caps.focusDistance.max) / 2);
-      // Dette kameraet mangler ekte autofokus (kun "manual" i focusMode).
-      // NB: front-kamera-skanning er et krav i seg selv (esker på pegg
-      // skannes ved å skyve telefonen under uten å ta dem ned), så et
-      // "bruk bakkameraet i stedet"-hint er IKKE en akseptabel løsning her
-      // - frontkameraet må faktisk fungere. Testing har vist at verken
-      // denne bryteren eller fysisk avstand til QR-koden gjør bildet
-      // skarpere på enkelte telefoner, som tyder på at årsaken kanskje
-      // ikke er feil fokusavstand i det hele tatt (se videre feilsøking).
-      if (hint) hint.textContent = 'Dra for å justere fokus manuelt';
-      wrap.style.display = 'flex';
-    } else {
-      wrap.style.display = 'none';
-    }
-  } catch (e) { wrap.style.display = 'none'; }
-}
- 
-async function onFocusSliderInput(e) {
-  if (!focusTrack) return;
-  const val = parseFloat(e.target.value);
-  try {
-    await focusTrack.applyConstraints({ advanced: [{ focusMode: 'manual', focusDistance: val }] });
-  } catch (err) { /* noen nettlesere tillater ikke live-endring - ignorer */ }
-  updateCamDebug();
 }
  
 // Eksperimentell stillbilde-vei for kameraer uten kontinuerlig autofokus
@@ -1003,6 +951,24 @@ function setupImageCapture(track) {
   } catch (e) { imageCapture = null; }
 }
  
+// Viser siste stillbilde i FULL oppløsning (ikke skalert ned) - den lille
+// miniatyren er 96×96px og kan gjøre et uskarpt bilde se "skarpt nok" ut
+// bare fordi det er forminsket. Her kan man dra rundt og se ekte piksler.
+function openStillLightbox() {
+  if (!lastStillBlob) return;
+  const img = document.getElementById('still-lightbox-img');
+  const box = document.getElementById('still-lightbox');
+  if (!img || !box) return;
+  const url = URL.createObjectURL(lastStillBlob);
+  img.src = url;
+  img.onload = () => URL.revokeObjectURL(url);
+  box.style.display = 'flex';
+}
+function closeStillLightbox() {
+  const box = document.getElementById('still-lightbox');
+  if (box) box.style.display = 'none';
+}
+ 
 // Bytter mellom bak- og frontkamera uten å nullstille skanne-historikken
 // (nyttig for å skanne bokser som henger på pegg, ved å vinkle telefonen
 // annerledes uten å måtte ta boksene ned).
@@ -1025,7 +991,6 @@ async function flipCamera() {
     await video.play();
     if (status) { status.style.display = 'none'; status.textContent = ''; }
     updateCamDebug();
-    setupFocusSlider(stream.getVideoTracks()[0]);
     setupImageCapture(stream.getVideoTracks()[0]);
   } catch(e) {
     if (status) { status.style.display = 'block'; status.textContent = `⚠️ Fikk ikke tilgang til ${nextMode === 'user' ? 'frontkamera' : 'bakkamera'}. Bytter tilbake...`; }
@@ -1037,7 +1002,6 @@ async function flipCamera() {
       await video.play();
       if (status) { status.style.display = 'none'; status.textContent = ''; }
       updateCamDebug();
-      setupFocusSlider(stream.getVideoTracks()[0]);
       setupImageCapture(stream.getVideoTracks()[0]);
     } catch(e2) {
       stopCamera();
