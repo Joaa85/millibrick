@@ -617,19 +617,38 @@ async function startCMFCamera() {
               }
             } catch (e) {}
             try {
-              const bitmap = await createImageBitmap(blob);
-              const stillCanvas = document.createElement('canvas');
-              stillCanvas.width = bitmap.width;
-              stillCanvas.height = bitmap.height;
-              const stillCtx = stillCanvas.getContext('2d', { willReadFrequently: true });
-              stillCtx.drawImage(bitmap, 0, 0);
-              let stillCodes = [];
-              if (useNative) {
-                const found = await det.detect(stillCanvas);
-                stillCodes = found.map(c => c.rawValue).filter(Boolean);
-              } else if (typeof jsQR !== 'undefined') {
-                const imageData = stillCtx.getImageData(0, 0, stillCanvas.width, stillCanvas.height);
-                stillCodes = detectMultipleQR(imageData).map(c => c.data).filter(Boolean);
+              // "from-image" tvinger fram riktig EXIF-rotasjon fra fotoet - uten
+              // dette kan et portrett-bilde bli lest inn "liggende", noe som helt
+              // ødelegger et strekkode-/QR-mønster selv om selve bildet er skarpt.
+              const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' }).catch(() => createImageBitmap(blob));
+ 
+              const detectOnBitmap = async (drawFn) => {
+                const c = document.createElement('canvas');
+                c.width = bitmap.width;
+                c.height = bitmap.height;
+                const cx = c.getContext('2d', { willReadFrequently: true });
+                drawFn(cx, c);
+                if (useNative) {
+                  const found = await det.detect(c);
+                  return found.map(x => x.rawValue).filter(Boolean);
+                } else if (typeof jsQR !== 'undefined') {
+                  const imageData = cx.getImageData(0, 0, c.width, c.height);
+                  return detectMultipleQR(imageData).map(x => x.data).filter(Boolean);
+                }
+                return [];
+              };
+ 
+              // Prøver først bildet slik det er, deretter speilvendt - noen
+              // telefoner lagrer frontkamera-stillbilder speilvendt (som i
+              // "selfie-speil"-forhåndsvisningen), noe som gjør QR-koden
+              // uleselig for skanneren selv om selve bildet er knivskarpt.
+              let stillCodes = await detectOnBitmap((cx) => cx.drawImage(bitmap, 0, 0));
+              if (!stillCodes.length) {
+                stillCodes = await detectOnBitmap((cx, c) => {
+                  cx.translate(c.width, 0);
+                  cx.scale(-1, 1);
+                  cx.drawImage(bitmap, 0, 0);
+                });
               }
               if (stillCodes.length) {
                 stillCodes.forEach(raw => handleDetectedCode(raw));
