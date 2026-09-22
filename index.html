@@ -226,6 +226,14 @@ a{color:var(--blue);}
 </div>
  
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<!-- zxing-wasm: sekundært, litt tregere gjenkjenningsforsøk (WebAssembly) som
+     dekker Data Matrix (i tillegg til QR/Aztec/PDF417) - et format jsQR ikke
+     støtter i det hele tatt. Brukes kun som fallback der native
+     BarcodeDetector mangler (Safari/iOS), siden Safari aldri har støttet
+     BarcodeDetector (bekreftet 0% i alle versjoner). Selve .wasm-filen
+     (~1 MB) lastes ikke ned før den faktisk trengs (først når readBarcodes
+     kalles), så dette koster ingenting på telefoner som bruker native-sporet. -->
+<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.4/dist/iife/reader/index.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
 // CMF DATABASE – kode → figurnavn + serie
@@ -578,6 +586,7 @@ async function startCMFCamera() {
         } else {
           const imageData = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
           rawCodes = detectMultipleQR(imageData).map(c => c.data).filter(Boolean);
+          if (!rawCodes.length) rawCodes = await detectViaZXing(imageData);
         }
         rawCodes.forEach(raw => handleDetectedCode(raw));
         purgeAndRenderLive();
@@ -628,11 +637,11 @@ async function startCMFCamera() {
                 if (useNative) {
                   const found = await det.detect(c);
                   return found.map(x => x.rawValue).filter(Boolean);
-                } else if (typeof jsQR !== 'undefined') {
-                  const imageData = cx.getImageData(0, 0, c.width, c.height);
-                  return detectMultipleQR(imageData).map(x => x.data).filter(Boolean);
                 }
-                return [];
+                const imageData = cx.getImageData(0, 0, c.width, c.height);
+                let codes = (typeof jsQR !== 'undefined') ? detectMultipleQR(imageData).map(x => x.data).filter(Boolean) : [];
+                if (!codes.length) codes = await detectViaZXing(imageData);
+                return codes;
               };
  
               // Prøver først bildet slik det er, deretter speilvendt - noen
@@ -693,6 +702,37 @@ function detectMultipleQR(imageData, maxCodes) {
     }
   }
   return found;
+}
+ 
+// ── Data Matrix / bredere kodestøtte via zxing-wasm ──────────────────
+// jsQR leser KUN klassiske QR-koder. LEGO sine byggefigur-esker bruker
+// derimot (fra Series 25/2023 og utover, inkludert Shrek-serien) en liten
+// Data Matrix-kode på undersiden av esken - et helt annet format som jsQR
+// ikke kan dekode i det hele tatt, uansett hvor skarpt bildet er. Safari/
+// iOS har heller ingen innebygd BarcodeDetector (bekreftet: 0% støtte i
+// samtlige versjoner, både desktop og iOS), så uten dette biblioteket kan
+// en iPhone aldri lese disse kodene - helt uavhengig av kamera/fokus.
+// Brukes kun som et sekundært (litt tregere, WebAssembly-basert) forsøk
+// når jsQR ikke finner noe.
+let zxingReadyPromise = null;
+function ensureZXing() {
+  if (!zxingReadyPromise) {
+    zxingReadyPromise = (typeof ZXingWASM !== 'undefined')
+      ? Promise.resolve(ZXingWASM)
+      : Promise.reject(new Error('zxing-wasm ikke lastet'));
+  }
+  return zxingReadyPromise;
+}
+async function detectViaZXing(imageData) {
+  try {
+    const zx = await ensureZXing();
+    const results = await zx.readBarcodes(imageData, {
+      formats: ['QRCode', 'DataMatrix', 'Aztec', 'PDF417'],
+      tryHarder: true,
+      maxNumberOfSymbols: 4,
+    });
+    return results.map(r => r.text).filter(Boolean);
+  } catch (e) { return []; }
 }
  
 // Oppdaterer/fornyer "sist sett"-tidspunktet for en kode – selve
