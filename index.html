@@ -60,7 +60,8 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .scan-pulse{position:absolute;inset:-4px;border-radius:12px;border:2px solid var(--yellow);opacity:0;animation:pulse 2s ease-in-out infinite;}
 @keyframes pulse{0%,100%{opacity:0}50%{opacity:.5}}
 .cam-status{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;font-weight:800;color:#fff;font-family:'Space Mono',monospace;text-shadow:0 1px 4px rgba(0,0,0,.9);padding:0 12px;}
-.cam-debug{position:absolute;top:8px;left:8px;font-size:9px;color:rgba(255,255,255,.55);font-family:'Space Mono',monospace;background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;pointer-events:none;}
+.cam-debug{position:absolute;top:8px;left:8px;right:56px;font-size:9px;color:rgba(255,255,255,.55);font-family:'Space Mono',monospace;background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;pointer-events:none;}
+.still-debug-thumb{position:absolute;top:54px;right:8px;z-index:6;width:64px;height:64px;object-fit:cover;border:2px solid var(--yellow);border-radius:8px;pointer-events:none;}
 .cam-flip-btn{position:absolute;top:10px;right:10px;z-index:6;width:38px;height:38px;border-radius:50%;border:none;background:rgba(13,13,26,.6);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px);}
 .cam-flip-btn:active{transform:scale(.92);}
 .cam-focus-wrap{position:absolute;left:10px;right:10px;bottom:8px;z-index:6;display:none;flex-direction:column;gap:4px;background:rgba(13,13,26,.65);backdrop-filter:blur(3px);border-radius:14px;padding:6px 12px 8px;}
@@ -178,6 +179,7 @@ a{color:var(--blue);}
       </div>
       <div class="cam-status" id="cam-status" style="display:none;"></div>
       <div class="cam-debug" id="cam-debug" style="display:none;"></div>
+      <img class="still-debug-thumb" id="still-debug-thumb" style="display:none;" alt="Siste stillbilde (feilsøking)">
       <div class="cam-focus-wrap" id="cam-focus-wrap">
         <div class="cam-focus-hint" id="cam-focus-hint"></div>
         <div class="cam-focus-row">
@@ -472,6 +474,9 @@ let currentFacingMode = 'environment';
 let imageCapture = null;
 let stillCaptureBusy = false;
 let stillCaptureTick = 0;
+let stillCaptureAttempts = 0;
+let stillCaptureErrors = 0;
+let stillCaptureLastError = '';
  
 function applyVideoMirror() {
   const video = document.getElementById('cam-video');
@@ -495,7 +500,7 @@ function cameraDebugSuffix() {
       focus = caps.focusMode ? ` foc:${caps.focusMode.join('/')}` : ' foc:?';
       if (caps.focusDistance) focus += ` dist:${cur.focusDistance ?? '?'}(${caps.focusDistance.min}-${caps.focusDistance.max})`;
     } catch(e) {}
-    const stillTag = imageCapture ? ' +foto' : '';
+    const stillTag = imageCapture ? ` foto:${stillCaptureAttempts}/${stillCaptureErrors}${stillCaptureLastError ? ' ('+stillCaptureLastError+')' : ''}` : '';
     return `${fm}, ${dims}${focus}${stillTag}`;
   } catch(e) { return ''; }
 }
@@ -597,7 +602,20 @@ async function startCMFCamera() {
         stillCaptureTick++;
         if (stillCaptureTick % 5 === 0) {
           stillCaptureBusy = true;
+          stillCaptureAttempts++;
           imageCapture.takePhoto().then(async (blob) => {
+            // Viser stillbildet på skjermen (liten miniatyr) slik at vi kan SE
+            // om selve fotoet er skarpere enn videobildet - i stedet for å bare
+            // gjette basert på om en kode ble lest eller ikke.
+            try {
+              const thumb = document.getElementById('still-debug-thumb');
+              if (thumb) {
+                const url = URL.createObjectURL(blob);
+                thumb.src = url;
+                thumb.style.display = 'block';
+                thumb.onload = () => URL.revokeObjectURL(url);
+              }
+            } catch (e) {}
             try {
               const bitmap = await createImageBitmap(blob);
               const stillCanvas = document.createElement('canvas');
@@ -617,8 +635,8 @@ async function startCMFCamera() {
                 stillCodes.forEach(raw => handleDetectedCode(raw));
                 purgeAndRenderLive();
               }
-            } catch (e) { /* stillbilde feilet denne runden - fortsetter med vanlig video-skanning */ }
-          }).catch(() => {}).finally(() => { stillCaptureBusy = false; });
+            } catch (e) { stillCaptureErrors++; stillCaptureLastError = (e && e.message) || 'ukjent feil'; }
+          }).catch((e) => { stillCaptureErrors++; stillCaptureLastError = (e && e.message) || 'takePhoto feilet'; }).finally(() => { stillCaptureBusy = false; updateCamDebug(); });
         }
       }
     }, 350);
@@ -836,6 +854,8 @@ function resetCamUI() {
   const focusWrap = document.getElementById('cam-focus-wrap');
   if (focusWrap) focusWrap.style.display = 'none';
   focusTrack = null;
+  const stillThumb = document.getElementById('still-debug-thumb');
+  if (stillThumb) stillThumb.style.display = 'none';
   liveMatches = new Map();
   lastRenderedKeys = '';
   const liveList = document.getElementById('cam-live-list');
@@ -950,6 +970,11 @@ async function onFocusSliderInput(e) {
 function setupImageCapture(track) {
   imageCapture = null;
   stillCaptureTick = 0;
+  stillCaptureAttempts = 0;
+  stillCaptureErrors = 0;
+  stillCaptureLastError = '';
+  const thumb = document.getElementById('still-debug-thumb');
+  if (thumb) thumb.style.display = 'none';
   try {
     if (!('ImageCapture' in window)) return;
     const caps = track.getCapabilities ? track.getCapabilities() : {};
