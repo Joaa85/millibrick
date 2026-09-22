@@ -17,9 +17,23 @@
 :root{--red:#E3000B;--yellow:#FFD700;--blue:#006CB7;--dark:#1a1a2e;--card:#fff;--bg:#f0f4ff;--text:#1a1a2e;--muted:#6b7280;--radius:16px;--shadow:0 4px 24px rgba(0,0,0,.10);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;max-width:480px;margin:0 auto;overflow-x:hidden;}
-.header{background:var(--red);padding:14px 20px 10px 10px;position:sticky;top:0;z-index:100;}
+.header{background:var(--red);padding:14px 20px 10px 10px;position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;}
 .logo{display:flex;align-items:center;}
 .logo-wordmark{height:58px;width:auto;display:block;}
+.saved-btn{flex:none;background:rgba(0,0,0,.25);color:#fff;border:2px solid #fff;border-radius:20px;padding:6px 12px;font-weight:800;font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer;font-family:'Nunito',sans-serif;}
+.saved-btn:active{transform:scale(.95);}
+.saved-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end;justify-content:center;}
+.saved-panel{background:#fff;border-radius:20px 20px 0 0;max-width:480px;width:100%;max-height:78vh;display:flex;flex-direction:column;}
+.saved-header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid #e5e7eb;flex:none;}
+.saved-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);line-height:1;padding:4px;}
+.saved-list{overflow-y:auto;padding:8px 18px 28px;}
+.saved-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f0f4ff;}
+.saved-item img{width:48px;height:48px;object-fit:contain;border-radius:8px;background:#f0f4ff;flex-shrink:0;}
+.saved-item .sin{flex:1;min-width:0;}
+.saved-item .sn{font-weight:800;font-size:13px;color:var(--dark);}
+.saved-item .ss{font-size:11px;color:var(--muted);margin-top:2px;}
+.saved-remove{background:none;border:none;font-size:18px;cursor:pointer;color:#ef4444;flex-shrink:0;padding:4px 8px;}
+.saved-empty{text-align:center;color:var(--muted);font-size:13px;padding:30px 10px;line-height:1.6;}
 .tabs{display:flex;background:var(--red);padding:6px 12px 12px;gap:10px;}
 .tab{flex:1;padding:6px 2px;border-radius:12px;border:3px solid var(--dark);background:#fff;color:rgba(26,26,46,.55);font-family:'Nunito',sans-serif;font-weight:800;font-size:10px;white-space:nowrap;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:2px;}
 .tab .ti{font-size:18px;}
@@ -55,12 +69,14 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .cam-focus-row span{font-size:14px;flex:none;}
 .cam-focus-row input[type=range]{flex:1;accent-color:var(--yellow);height:20px;}
 .cam-live-list{position:absolute;top:0;left:0;right:44px;z-index:5;display:flex;flex-direction:column;gap:6px;padding:8px;pointer-events:none;max-height:100%;overflow:hidden;}
-.cam-live-item{display:flex;align-items:center;gap:12px;background:rgba(13,13,26,.88);backdrop-filter:blur(3px);border-radius:12px;padding:8px 12px;animation:up .2s ease;}
+.cam-live-item{display:flex;align-items:center;gap:12px;background:rgba(13,13,26,.88);backdrop-filter:blur(3px);border-radius:12px;padding:8px 12px;animation:up .2s ease;pointer-events:auto;}
 .cam-live-item img{width:64px;height:64px;object-fit:contain;border-radius:10px;background:#fff;flex-shrink:0;}
 .cam-live-item .clin{min-width:0;}
 .cam-live-item .cln{font-weight:800;font-size:14px;color:#fff;line-height:1.25;}
 .cam-live-item .cls{font-size:11px;color:rgba(255,255,255,.75);font-family:'Space Mono',monospace;margin-top:2px;}
 .cam-live-item.notfound .cln{color:#FFD700;}
+.live-save-btn{flex:none;pointer-events:auto;width:34px;height:34px;border-radius:50%;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.live-save-btn:disabled{background:rgba(16,185,129,.3);cursor:default;}
 .btn{width:100%;padding:13px;border-radius:12px;border:none;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;}
 .btn:active{transform:scale(.97);}
 .btn-red{background:var(--red);color:#fff;}
@@ -92,12 +108,15 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .b-red{background:#fee2e2;color:var(--red);}
 .banner{background:var(--dark);color:var(--yellow);padding:9px 14px;border-radius:10px;font-family:'Space Mono',monospace;font-size:12px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px;word-break:break-all;}
 .mf-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:8px;}
-.mf-card{background:var(--card);border-radius:var(--radius);padding:13px;text-align:center;box-shadow:var(--shadow);animation:up .3s ease;cursor:pointer;}
+.mf-card{background:var(--card);border-radius:var(--radius);padding:13px;text-align:center;box-shadow:var(--shadow);animation:up .3s ease;}
+.mf-card-link{cursor:pointer;}
 .mf-card img{width:78px;height:78px;object-fit:contain;margin-bottom:7px;}
 .mf-cname{font-size:12px;font-weight:800;color:var(--dark);margin-bottom:3px;line-height:1.3;}
 .mf-cid{font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;}
 .conf-bar{height:4px;background:#e5e7eb;border-radius:2px;margin-top:7px;overflow:hidden;}
 .conf-fill{height:100%;background:var(--yellow);border-radius:2px;transition:width .5s;}
+.mf-save-btn{margin-top:9px;width:100%;padding:6px 4px;border-radius:8px;border:2px solid var(--dark);background:#fff;color:var(--dark);font-weight:800;font-size:11px;cursor:pointer;font-family:'Nunito',sans-serif;}
+.mf-save-btn:disabled{background:#f0f4ff;color:var(--muted);border-color:#e5e7eb;cursor:default;}
 .idea-card{background:var(--card);border-radius:var(--radius);padding:15px;margin-bottom:12px;box-shadow:var(--shadow);animation:up .3s ease;}
 .idea-title{font-weight:800;font-size:15px;color:var(--dark);margin-bottom:6px;display:flex;align-items:center;}
 .idea-num{display:inline-block;background:var(--red);color:#fff;font-weight:900;font-size:12px;width:24px;height:24px;border-radius:6px;text-align:center;line-height:24px;margin-right:8px;flex-shrink:0;}
@@ -117,6 +136,17 @@ a{color:var(--blue);}
  
 <div class="header">
   <div class="logo"><img src="/icons/legaaland-wordmark.png" alt="LegAaland" class="logo-wordmark"></div>
+  <button class="saved-btn" id="btn-saved" onclick="openSavedOverlay()">💾 <span id="saved-count">0</span></button>
+</div>
+ 
+<div class="saved-overlay" id="saved-overlay" style="display:none;">
+  <div class="saved-panel">
+    <div class="saved-header">
+      <div style="font-weight:900;font-size:17px;color:var(--dark);">💾 Lagrede figurer og klosser</div>
+      <button class="saved-close" onclick="closeSavedOverlay()">✕</button>
+    </div>
+    <div class="saved-list" id="saved-list"></div>
+  </div>
 </div>
  
 <div class="tabs">
@@ -167,7 +197,7 @@ a{color:var(--blue);}
     <div class="upload-area" onclick="document.getElementById('scan-file').click()">
       <div class="ui">📸</div>
       <p>Trykk for å ta bilde eller velg fra galleri</p>
-      <input type="file" id="scan-file" accept="image/*" capture="environment" onchange="handleScanImage(event)">
+      <input type="file" id="scan-file" accept="image/*" onchange="handleScanImage(event)">
     </div>
     <img id="scan-preview" class="preview-img" style="display:none">
     <div id="scan-results"></div>
@@ -424,6 +454,15 @@ let liveMatches = new Map(); // kode-nøkkel → { match, rawCode, ts }
 const LIVE_TIMEOUT_MS = 2500; // hvor lenge en kode "henger igjen" (et par sekunder) etter siste treff, for å unngå flimring
 let scanCanvas = null, scanCtx = null;
 let currentFacingMode = 'environment';
+// Eksperimentelt: på kameraer uten kontinuerlig autofokus (typisk front-
+// kameraer med fastfokus) tar vi i tillegg innimellom et ekte STILLBILDE
+// via ImageCapture.takePhoto() - dette bruker telefonens ordinære foto-
+// pipeline i stedet for den kontinuerlige forhåndsvisnings-strømmen, som på
+// enkelte telefoner har mye lavere skarphet/oppløsning enn et stillbilde
+// (blant annet pga. "glatting" som ofte kjøres på selfie-forhåndsvisning).
+let imageCapture = null;
+let stillCaptureBusy = false;
+let stillCaptureTick = 0;
  
 function applyVideoMirror() {
   const video = document.getElementById('cam-video');
@@ -447,7 +486,8 @@ function cameraDebugSuffix() {
       focus = caps.focusMode ? ` foc:${caps.focusMode.join('/')}` : ' foc:?';
       if (caps.focusDistance) focus += ` dist:${cur.focusDistance ?? '?'}(${caps.focusDistance.min}-${caps.focusDistance.max})`;
     } catch(e) {}
-    return `${fm}, ${dims}${focus}`;
+    const stillTag = imageCapture ? ' +foto' : '';
+    return `${fm}, ${dims}${focus}${stillTag}`;
   } catch(e) { return ''; }
 }
  
@@ -485,6 +525,7 @@ async function startCMFCamera() {
     status.textContent = '';
     updateCamDebug();
     setupFocusSlider(stream.getVideoTracks()[0]);
+    setupImageCapture(stream.getVideoTracks()[0]);
     const toggleBtn = document.getElementById('btn-toggle-cam');
     if (toggleBtn) { toggleBtn.textContent = '⏹ Stopp kamera'; toggleBtn.className = 'btn btn-stop'; }
  
@@ -538,6 +579,39 @@ async function startCMFCamera() {
           status.textContent = '';
         }
       } catch(e) {}
+ 
+      // Eksperimentell stillbilde-vei (se setupImageCapture) - kjører
+      // sjeldnere enn video-skanningen over, siden takePhoto() er tregere
+      // og kan utløse telefonens lukkerlyd/lukker-animasjon. Kjører kun
+      // når ImageCapture ble slått på (kamera uten kontinuerlig autofokus).
+      if (imageCapture && !stillCaptureBusy) {
+        stillCaptureTick++;
+        if (stillCaptureTick % 5 === 0) {
+          stillCaptureBusy = true;
+          imageCapture.takePhoto().then(async (blob) => {
+            try {
+              const bitmap = await createImageBitmap(blob);
+              const stillCanvas = document.createElement('canvas');
+              stillCanvas.width = bitmap.width;
+              stillCanvas.height = bitmap.height;
+              const stillCtx = stillCanvas.getContext('2d', { willReadFrequently: true });
+              stillCtx.drawImage(bitmap, 0, 0);
+              let stillCodes = [];
+              if (useNative) {
+                const found = await det.detect(stillCanvas);
+                stillCodes = found.map(c => c.rawValue).filter(Boolean);
+              } else if (typeof jsQR !== 'undefined') {
+                const imageData = stillCtx.getImageData(0, 0, stillCanvas.width, stillCanvas.height);
+                stillCodes = detectMultipleQR(imageData).map(c => c.data).filter(Boolean);
+              }
+              if (stillCodes.length) {
+                stillCodes.forEach(raw => handleDetectedCode(raw));
+                purgeAndRenderLive();
+              }
+            } catch (e) { /* stillbilde feilet denne runden - fortsetter med vanlig video-skanning */ }
+          }).catch(() => {}).finally(() => { stillCaptureBusy = false; });
+        }
+      }
     }, 350);
   } catch(e) {
     let msg = e.name === 'NotAllowedError'
@@ -615,15 +689,18 @@ function renderLiveMatches() {
   const list = document.getElementById('cam-live-list');
   if (!list) return;
   if (liveMatches.size === 0) { list.innerHTML = ''; return; }
-  list.innerHTML = [...liveMatches.values()].map(entry => {
+  list.innerHTML = [...liveMatches.entries()].map(([key, entry]) => {
     if (entry.match) {
       const imgUrl = cmfImageUrl(entry.match);
+      const saveId = 'cmf-' + (entry.match.num || entry.match.name);
+      const already = isSaved(saveId);
       return `<div class="cam-live-item">
         ${imgUrl ? `<img src="${imgUrl}" alt="${entry.match.name}" onerror="this.style.display='none'">` : ''}
         <div class="clin">
           <div class="cln">✅ ${entry.match.name}</div>
           <div class="cls">${entry.match.series}</div>
         </div>
+        <button class="live-save-btn" onclick="saveLiveMatch('${key.replace(/'/g,"\\'")}')" ${already ? 'disabled' : ''} title="Lagre">${already ? '✅' : '💾'}</button>
       </div>`;
     }
     const nums = entry.rawCode.match(/\d{7}/g) || [];
@@ -653,9 +730,89 @@ function cmfImageUrl(match) {
   return `https://minifigurescanner.com/cmf/${slug}/${pos}.webp`;
 }
  
+// ── Lagrede figurer/klosser ─────────────────────────────────
+// Rent frivillig oversikt: standardoppførselen er akkurat som før (ingenting
+// lagres med mindre man selv trykker 💾). Lagres i localStorage – altså kun
+// på DENNE telefonen/nettleseren, ikke delt mellom familiemedlemmer.
+const SAVED_KEY = 'legaaland-saved-items';
+function getSavedItems() {
+  try { return JSON.parse(localStorage.getItem(SAVED_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+function setSavedItems(items) {
+  try { localStorage.setItem(SAVED_KEY, JSON.stringify(items)); } catch(e) { /* f.eks. privat nettlesing - helt greit, bare ikke-varig */ }
+  updateSavedCount();
+}
+function isSaved(id) {
+  return getSavedItems().some(it => it.id === id);
+}
+function saveItem(item) {
+  const items = getSavedItems();
+  if (items.some(it => it.id === item.id)) return;
+  items.unshift(Object.assign({}, item, { savedAt: Date.now() }));
+  setSavedItems(items);
+}
+function removeSavedItem(id) {
+  setSavedItems(getSavedItems().filter(it => it.id !== id));
+  renderSavedList();
+  // Oppdater "Lagre"-knappene som ligger synlig bak overlayen (om noen),
+  // slik at de ikke fortsatt viser "✅ Lagret" etter at man har fjernet den.
+  if (lastScanItems.length) showScanResults(lastScanItems);
+  renderLiveMatches();
+}
+function updateSavedCount() {
+  const el = document.getElementById('saved-count');
+  if (el) el.textContent = getSavedItems().length;
+}
+function openSavedOverlay() {
+  renderSavedList();
+  document.getElementById('saved-overlay').style.display = 'flex';
+}
+function closeSavedOverlay() {
+  document.getElementById('saved-overlay').style.display = 'none';
+}
+function renderSavedList() {
+  const list = document.getElementById('saved-list');
+  if (!list) return;
+  const items = getSavedItems();
+  if (!items.length) {
+    list.innerHTML = `<div class="saved-empty">Ingenting lagret ennå.<br>Trykk 💾 på en figur eller kloss du skanner for å legge den til her.</div>`;
+    return;
+  }
+  list.innerHTML = items.map(it => `
+    <div class="saved-item">
+      ${it.img ? `<img src="${it.img}" alt="${it.name}" onerror="this.style.display='none'">` : '<div style="width:48px;height:48px;flex-shrink:0;"></div>'}
+      <div class="sin">
+        <div class="sn">${it.name}</div>
+        <div class="ss">${it.sub||''}</div>
+      </div>
+      <button class="saved-remove" onclick="removeSavedItem('${it.id}')" title="Fjern">🗑</button>
+    </div>`).join('');
+}
+function saveLiveMatch(key) {
+  const entry = liveMatches.get(key);
+  if (!entry || !entry.match) return;
+  const imgUrl = cmfImageUrl(entry.match);
+  const saveId = 'cmf-' + (entry.match.num || entry.match.name);
+  saveItem({ id: saveId, type: 'cmf', name: entry.match.name, sub: entry.match.series, img: imgUrl || '' });
+  renderLiveMatches();
+}
+function saveScanItem(i) {
+  const item = lastScanItems[i];
+  if (!item) return;
+  const name = item.name || item.id || 'Ukjent';
+  const id = item.id || '';
+  const saveId = 'fig-' + (id || name);
+  saveItem({ id: saveId, type: 'fig', name, sub: id, img: item.img_url || '' });
+  showScanResults(lastScanItems);
+}
+ 
 function stopCamera() {
   if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  imageCapture = null;
+  stillCaptureBusy = false;
+  stillCaptureTick = 0;
   resetCamUI();
 }
  
@@ -776,6 +933,23 @@ async function onFocusSliderInput(e) {
   updateCamDebug();
 }
  
+// Eksperimentell stillbilde-vei for kameraer uten kontinuerlig autofokus
+// (se kommentaren ved "let imageCapture" lenger oppe for hvorfor). Vi
+// bruker kun dette når ImageCapture faktisk støttes av nettleseren -
+// finnes den ikke, faller vi helt tilbake til vanlig video-basert skanning
+// akkurat som før, uten noen synlig forskjell for brukeren.
+function setupImageCapture(track) {
+  imageCapture = null;
+  stillCaptureTick = 0;
+  try {
+    if (!('ImageCapture' in window)) return;
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    const hasContinuous = caps.focusMode && caps.focusMode.includes('continuous');
+    if (hasContinuous) return; // vanlig autofokus virker fint på video-strømmen allerede
+    imageCapture = new ImageCapture(track);
+  } catch (e) { imageCapture = null; }
+}
+ 
 // Bytter mellom bak- og frontkamera uten å nullstille skanne-historikken
 // (nyttig for å skanne bokser som henger på pegg, ved å vinkle telefonen
 // annerledes uten å måtte ta boksene ned).
@@ -799,6 +973,7 @@ async function flipCamera() {
     if (status) { status.style.display = 'none'; status.textContent = ''; }
     updateCamDebug();
     setupFocusSlider(stream.getVideoTracks()[0]);
+    setupImageCapture(stream.getVideoTracks()[0]);
   } catch(e) {
     if (status) { status.style.display = 'block'; status.textContent = `⚠️ Fikk ikke tilgang til ${nextMode === 'user' ? 'frontkamera' : 'bakkamera'}. Bytter tilbake...`; }
     try {
@@ -810,6 +985,7 @@ async function flipCamera() {
       if (status) { status.style.display = 'none'; status.textContent = ''; }
       updateCamDebug();
       setupFocusSlider(stream.getVideoTracks()[0]);
+      setupImageCapture(stream.getVideoTracks()[0]);
     } catch(e2) {
       stopCamera();
     }
@@ -874,22 +1050,29 @@ function itemLinkUrl(item) {
   return `https://www.bricklink.com/v2/catalog/catalogitem.page?P=${id}`;
 }
  
+let lastScanItems = [];
 function showScanResults(items) {
   const results = document.getElementById('scan-results');
   const top = items.slice(0,6);
+  lastScanItems = top;
   let html = `<div style="font-size:16px;font-weight:900;color:var(--dark);margin-bottom:12px;">🎯 Gjenkjente klosser</div><div class="mf-grid">`;
-  top.forEach(item => {
+  top.forEach((item, i) => {
     const conf = Math.round((item.score||0)*100);
     const name = item.name||item.id||'Ukjent';
     const img  = item.img_url||'';
     const id   = item.id||'';
     const blUrl = itemLinkUrl(item);
-    html += `<div class="mf-card" onclick="window.open('${blUrl}','_blank')">
-      ${img?`<img src="${img}" alt="${name}" onerror="this.style.display='none'">`:'<div style="font-size:36px;margin-bottom:8px;">🧱</div>'}
-      <div class="mf-cname">${name}</div>
-      <div class="mf-cid">${id}</div>
-      <div class="conf-bar"><div class="conf-fill" style="width:${conf}%"></div></div>
-      <div style="font-size:10px;color:var(--muted);margin-top:4px;">${conf}% sikker</div>
+    const saveId = 'fig-' + (id || name);
+    const already = isSaved(saveId);
+    html += `<div class="mf-card">
+      <div class="mf-card-link" onclick="window.open('${blUrl}','_blank')">
+        ${img?`<img src="${img}" alt="${name}" onerror="this.style.display='none'">`:'<div style="font-size:36px;margin-bottom:8px;">🧱</div>'}
+        <div class="mf-cname">${name}</div>
+        <div class="mf-cid">${id}</div>
+        <div class="conf-bar"><div class="conf-fill" style="width:${conf}%"></div></div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;">${conf}% sikker</div>
+      </div>
+      <button class="mf-save-btn" onclick="saveScanItem(${i})" ${already ? 'disabled' : ''}>${already ? '✅ Lagret' : '💾 Lagre'}</button>
     </div>`;
   });
   const first = top[0];
@@ -1146,6 +1329,7 @@ if ('serviceWorker' in navigator) {
 if (document.getElementById('tab-cmf').classList.contains('active')) {
   startCMFCamera();
 }
+updateSavedCount();
 </script>
 </body>
 </html>
