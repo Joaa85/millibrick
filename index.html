@@ -94,6 +94,8 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .upload-area .ui{font-size:34px;margin-bottom:6px;}
 .upload-area p{font-size:13px;color:var(--muted);font-weight:700;}
 .upload-area input{display:none;}
+.upload-row{display:flex;gap:12px;margin-bottom:14px;}
+.upload-half{flex:1;margin-bottom:0;padding:22px 8px;}
 .preview-img{width:100%;border-radius:var(--radius);margin-bottom:14px;max-height:260px;object-fit:contain;background:#111;}
 .result-card{background:var(--card);border-radius:var(--radius);padding:15px;margin-bottom:12px;box-shadow:var(--shadow);display:flex;gap:13px;align-items:flex-start;animation:up .3s ease;}
 @keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
@@ -194,10 +196,17 @@ a{color:var(--blue);}
   <div class="tab-content" id="tab-scan">
     <div class="section-title"><img class="title-icon" src="/icons/tab-minifig.png" alt=""> Skann Minifigur</div>
     <p class="section-sub">Ta bilde av en kloss eller minifigur – appen finner hvilket sett den tilhører og hva den er verdt.</p>
-    <div class="upload-area" onclick="document.getElementById('scan-file').click()">
-      <div class="ui">📸</div>
-      <p>Trykk for å ta bilde eller velg fra galleri</p>
-      <input type="file" id="scan-file" accept="image/*" onchange="handleScanImage(event)">
+    <div class="upload-row">
+      <div class="upload-area upload-half" onclick="document.getElementById('scan-file-camera').click()">
+        <div class="ui">📸</div>
+        <p>Ta bilde</p>
+        <input type="file" id="scan-file-camera" accept="image/*" capture="environment" onchange="handleScanImage(event)">
+      </div>
+      <div class="upload-area upload-half" onclick="document.getElementById('scan-file-gallery').click()">
+        <div class="ui">🖼️</div>
+        <p>Velg fra galleri</p>
+        <input type="file" id="scan-file-gallery" accept="image/*" onchange="handleScanImage(event)">
+      </div>
     </div>
     <img id="scan-preview" class="preview-img" style="display:none">
     <div id="scan-results"></div>
@@ -1123,8 +1132,11 @@ Skill mellom: brick (standard høyde), plate (flat), tile (glatt), slope (skrå)
         ]}]
       })
     }, 30000);
-    if (!r1.ok) throw new Error('API '+r1.status);
     const d1 = await r1.json();
+    // Viser den faktiske feilmeldingen fra Anthropic-API-et (f.eks. hvorfor
+    // en 400 skjedde) i stedet for bare statuskoden - "API 400" alene sier
+    // ingenting om HVA som var galt med forespørselen.
+    if (!r1.ok) throw new Error(d1?.error?.message || ('API-feil '+r1.status));
     const t1 = (d1.content||[]).map(b=>b.text||'').join('').trim();
     bricksFound = JSON.parse(t1.match(/\{[\s\S]*\}/)[0]);
   } catch(e) {
@@ -1181,8 +1193,8 @@ Svar KUN med JSON (ingen markdown):
         ]}]
       })
     }, 45000);
-    if (!r2.ok) throw new Error('API '+r2.status);
     const d2 = await r2.json();
+    if (!r2.ok) throw new Error(d2?.error?.message || ('API-feil '+r2.status));
     const t2 = (d2.content||[]).map(b=>b.text||'').join('').trim();
     const parsed = JSON.parse(t2.match(/\{[\s\S]*\}/)[0]);
     showBuildIdeas(bricksFound, parsed.ideer||[]);
